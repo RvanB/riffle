@@ -1,4 +1,5 @@
 let worker = null;
+let workerPromise = null;
 let nextRequestId = 1;
 const pending = new Map();
 
@@ -11,16 +12,28 @@ const lowPriorityQueue = [];
 let inFlight = 0;
 const MAX_IN_FLIGHT = 1;
 
-function getWorker() {
-  if (worker) return worker;
-  // Cache-bust the worker URL per page load — Firefox in particular caches
-  // module workers aggressively and a hard-reload doesn't always invalidate
-  // them. Remove the query string when shipping if you want to leverage HTTP
-  // caching for the worker file.
+async function createWorker() {
   const workerUrl = new URL("./pdfWorker.js", import.meta.url);
-  workerUrl.searchParams.set("v", String(Date.now()));
-  worker = new Worker(workerUrl, { type: "module" });
-  worker.addEventListener("message", event => {
+  let scriptUrl;
+  if (workerUrl.origin === self.location.origin) {
+    // Same origin (dev mode or self-hosted): load the worker file directly.
+    // Cache-bust per page load — Firefox in particular caches module
+    // workers aggressively and hard-reload doesn't always invalidate them.
+    workerUrl.searchParams.set("v", String(Date.now()));
+    scriptUrl = workerUrl.href;
+  } else {
+    // Cross-origin (CDN-hosted): browsers refuse to spawn a Worker from a
+    // different origin even with permissive CORS. Fetch the worker source
+    // and wrap it in a same-origin Blob URL.
+    const response = await fetch(workerUrl, { mode: "cors" });
+    if (!response.ok) throw new Error(`Failed to fetch pdfWorker.js: ${response.status}`);
+    const source = await response.text();
+    const blob = new Blob([source], { type: "application/javascript" });
+    scriptUrl = URL.createObjectURL(blob);
+  }
+  const w = new Worker(scriptUrl, { type: "module" });
+  w.addEventListener("message", event => {
+    if (event.data?.debug) { console.log("[worker]", ...event.data.debug); return; }
     const { id, ok, result, error } = event.data;
     const entry = pending.get(id);
     if (!entry) return;
@@ -30,10 +43,20 @@ function getWorker() {
     else entry.reject(new Error(error));
     dispatch();
   });
-  worker.addEventListener("error", event => {
+  w.addEventListener("error", event => {
     console.error("PDF worker error:", event.message || event);
   });
-  return worker;
+  return w;
+}
+
+function ensureWorker() {
+  if (worker) return Promise.resolve(worker);
+  if (workerPromise) return workerPromise;
+  workerPromise = createWorker().then(w => {
+    worker = w;
+    return w;
+  });
+  return workerPromise;
 }
 
 function dispatch() {
@@ -43,7 +66,14 @@ function dispatch() {
     inFlight += 1;
     const id = nextRequestId++;
     pending.set(id, { resolve: entry.resolve, reject: entry.reject });
-    getWorker().postMessage({ id, type: entry.type, payload: entry.payload }, entry.transfer);
+    ensureWorker().then(
+      w => w.postMessage({ id, type: entry.type, payload: entry.payload }, entry.transfer),
+      err => {
+        pending.delete(id);
+        inFlight = Math.max(0, inFlight - 1);
+        entry.reject(err);
+      },
+    );
   }
 }
 
