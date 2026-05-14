@@ -5,18 +5,36 @@ const CONTENT_ZOOM_MAX = 6;
 const CONTENT_ZOOM_STEP = 1.25;
 const MAX_RENDER_CANVAS_EDGE = 8192;
 
+function findScrollableAncestor(node) {
+  let el = node?.parentElement ?? null;
+  while (el) {
+    const overflowY = getComputedStyle(el).overflowY;
+    if (overflowY === "auto" || overflowY === "scroll") return el;
+    el = el.parentElement;
+  }
+  return node?.parentElement ?? null;
+}
+
+// Owns content/render zoom. Reads viewer.spreadCanvas + viewer.viewport for
+// sizing math, sets CSS dimensions directly on the canvas to display it at
+// the current zoom level. No DOM wrappers required.
 export class ZoomController {
-  constructor(app) {
-    this.app = app;
+  constructor(viewer) {
+    this.viewer = viewer;
     this.contentZoom = 1;
     this.renderZoom = 1;
   }
 
+  #resolveViewport() {
+    return this.viewer.viewport ?? findScrollableAncestor(this.viewer.spreadCanvas);
+  }
+
   getCanvasViewportSize() {
-    const rect = this.app.canvasArea.getBoundingClientRect();
+    const viewport = this.#resolveViewport();
+    const rect = viewport?.getBoundingClientRect();
     return {
-      width: Math.max(1, rect.width),
-      height: Math.max(1, rect.height),
+      width: Math.max(1, rect?.width ?? 1),
+      height: Math.max(1, rect?.height ?? 1),
     };
   }
 
@@ -24,7 +42,7 @@ export class ZoomController {
     const viewport = this.getCanvasViewportSize();
     const containerWidth = Math.max(1, viewport.width - 64);
     const containerHeight = Math.max(1, viewport.height - 64);
-    const baseScale = computeScale(this.app.book.layout, containerWidth, containerHeight);
+    const baseScale = computeScale(this.viewer.layout, containerWidth, containerHeight);
     return baseScale * this.renderZoom;
   }
 
@@ -32,8 +50,8 @@ export class ZoomController {
     const viewport = this.getCanvasViewportSize();
     const containerWidth = Math.max(1, viewport.width - 64);
     const containerHeight = Math.max(1, viewport.height - 64);
-    const baseScale = computeScale(this.app.book.layout, containerWidth, containerHeight);
-    const baseMargins = computeMargins(this.app.book.layout, baseScale);
+    const baseScale = computeScale(this.viewer.layout, containerWidth, containerHeight);
+    const baseMargins = computeMargins(this.viewer.layout, baseScale);
     const maxWidthZoom = (2 * baseMargins.pagePxW) > 0
       ? MAX_RENDER_CANVAS_EDGE / (2 * baseMargins.pagePxW)
       : targetZoom;
@@ -43,59 +61,49 @@ export class ZoomController {
     return Math.max(CONTENT_ZOOM_MIN, Math.min(targetZoom, maxWidthZoom, maxHeightZoom));
   }
 
+  // Sets CSS width/height on the spread canvas so it displays at the
+  // requested content zoom (the canvas's pixel buffer is sized for the
+  // current renderZoom; the CSS scaling adjusts the displayed size).
   syncCanvasStage() {
-    const { canvasStage, canvasWrap, spreadCanvas, uiState } = this.app;
-    if (canvasStage) {
-      const displayScale = this.renderZoom > 0 ? this.contentZoom / this.renderZoom : this.contentZoom;
-      canvasStage.style.width = `${Math.max(1, Math.round(spreadCanvas.width * displayScale))}px`;
-      canvasStage.style.height = `${Math.max(1, Math.round(spreadCanvas.height * displayScale))}px`;
-      canvasStage.classList.toggle("show-page-shadow", uiState.showPageBorder);
-    }
-    canvasWrap.dataset.mode = uiState.appMode;
-    this.syncZoomUI();
-  }
-
-  syncZoomUI() {
-    const zoomIn = document.getElementById("canvas-zoom-in");
-    const zoomOut = document.getElementById("canvas-zoom-out");
-    if (!zoomIn || !zoomOut) return;
-    zoomIn.disabled = this.contentZoom >= CONTENT_ZOOM_MAX;
-    zoomOut.disabled = this.contentZoom <= CONTENT_ZOOM_MIN;
+    const { spreadCanvas } = this.viewer;
+    if (!spreadCanvas) return;
+    const displayScale = this.renderZoom > 0 ? this.contentZoom / this.renderZoom : this.contentZoom;
+    const cssW = `${Math.max(1, Math.round(spreadCanvas.width * displayScale))}px`;
+    const cssH = `${Math.max(1, Math.round(spreadCanvas.height * displayScale))}px`;
+    if (spreadCanvas.style.width !== cssW) spreadCanvas.style.width = cssW;
+    if (spreadCanvas.style.height !== cssH) spreadCanvas.style.height = cssH;
   }
 
   #zoomTo(nextZoom) {
     if (Math.abs(nextZoom - this.contentZoom) < 0.0001) return;
-    const { canvasArea } = this.app;
-    const viewportWidth = canvasArea.clientWidth;
-    const viewportHeight = canvasArea.clientHeight;
-    const centerX = canvasArea.scrollLeft + viewportWidth / 2;
-    const centerY = canvasArea.scrollTop + viewportHeight / 2;
+    const viewport = this.#resolveViewport();
+    const viewportWidth = viewport?.clientWidth ?? 0;
+    const viewportHeight = viewport?.clientHeight ?? 0;
+    const centerX = (viewport?.scrollLeft ?? 0) + viewportWidth / 2;
+    const centerY = (viewport?.scrollTop ?? 0) + viewportHeight / 2;
     const zoomRatio = nextZoom / this.contentZoom;
 
     this.contentZoom = nextZoom;
-    // Update the canvas's CSS dimensions immediately so the existing pixel
-    // buffer is shown stretched (or shrunk) to the new zoom. No redraw and
-    // no renderZoom change here — the existing surface textures stay in
-    // place and WebGPU bilinearly samples them onto the new pageRect. When
-    // higher-res bitmaps land via the worker, App.onPageReady updates
-    // renderZoom and redraws against the new bitmap.
     this.syncCanvasStage();
-    requestAnimationFrame(() => {
-      canvasArea.scrollLeft = Math.max(0, centerX * zoomRatio - viewportWidth / 2);
-      canvasArea.scrollTop = Math.max(0, centerY * zoomRatio - viewportHeight / 2);
-    });
+    if (viewport) {
+      requestAnimationFrame(() => {
+        viewport.scrollLeft = Math.max(0, centerX * zoomRatio - viewportWidth / 2);
+        viewport.scrollTop = Math.max(0, centerY * zoomRatio - viewportHeight / 2);
+      });
+    }
     this.#requestHighResAtCurrentZoom();
+    this.viewer.emit("zoomchange", { contentZoom: this.contentZoom });
   }
 
   #requestHighResAtCurrentZoom() {
-    const app = this.app;
-    const targetSpread = app.navigationController.getEffectiveSpread();
-    if (targetSpread < 0 || targetSpread >= app.viewerBook.numSpreads()) return;
-    const { left, right } = app.viewerBook.spreadPageEntries(targetSpread);
+    const v = this.viewer;
+    const targetSpread = v.navigationController.getEffectiveSpread();
+    if (targetSpread < 0 || targetSpread >= v.book.numSpreads()) return;
+    const { left, right } = v.book.spreadPageEntries(targetSpread);
     for (const pageIndex of [left.pageIndex, right.pageIndex]) {
       if (pageIndex < 0) continue;
-      if (app.lazyPageLoader.isPageHighResReady(pageIndex, this.contentZoom)) continue;
-      app.lazyPageLoader.ensurePageHighRes(pageIndex, this.contentZoom);
+      if (v.lazyPageLoader.isPageHighResReady(pageIndex, this.contentZoom)) continue;
+      v.lazyPageLoader.ensurePageHighRes(pageIndex, this.contentZoom);
     }
   }
 
@@ -117,11 +125,11 @@ export class ZoomController {
   }
 
   isSpreadHighResReady(spreadIndex, previewZoom = this.contentZoom) {
-    const { viewerBook, lazyPageLoader } = this.app;
-    if (spreadIndex < 0 || spreadIndex >= viewerBook.numSpreads()) return true;
-    const { left, right } = viewerBook.spreadPageEntries(spreadIndex);
+    const v = this.viewer;
+    if (spreadIndex < 0 || spreadIndex >= v.book.numSpreads()) return true;
+    const { left, right } = v.book.spreadPageEntries(spreadIndex);
     return [left.pageIndex, right.pageIndex]
       .filter(index => index >= 0)
-      .every(index => lazyPageLoader.isPageHighResReady(index, previewZoom));
+      .every(index => v.lazyPageLoader.isPageHighResReady(index, previewZoom));
   }
 }

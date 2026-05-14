@@ -1,14 +1,14 @@
-function cloneSet(set) {
-  return new Set(set);
-}
-
 const BASE_TURN_DURATION_MS = 750;
 const BASE_MULTI_SPREAD_TURN_INTERVAL_MS = 40;
 const MAX_QUEUE_DURATION_MS = 2000;
 
+// Drives spread-to-spread navigation including the page-turn animation and
+// queued multi-spread jumps. Reads viewer.currentSpread / effectiveSpread,
+// writes to them, and emits animation lifecycle events for hosts (overlays,
+// editing UI, etc.) to react to.
 export class NavigationController {
-  constructor(app) {
-    this.app = app;
+  constructor(viewer) {
+    this.viewer = viewer;
     this.queuedSpreadTurnTimer = 0;
     this.queuedSpreadTurnToken = 0;
     this.pendingTurnStartToken = 0;
@@ -17,8 +17,8 @@ export class NavigationController {
   }
 
   getEffectiveSpread() {
-    const app = this.app;
-    return app.spreadRenderer.isAnimating ? app.uiState.effectiveSpread : app.uiState.currentSpread;
+    const v = this.viewer;
+    return v.spreadRenderer.isAnimating ? v.effectiveSpread : v.currentSpread;
   }
 
   resetAnimationState() {
@@ -27,13 +27,13 @@ export class NavigationController {
   }
 
   #kickoffHighResForSpread(spreadIndex) {
-    const app = this.app;
-    if (spreadIndex < 0 || spreadIndex >= app.viewerBook.numSpreads()) return;
-    const { left, right } = app.viewerBook.spreadPageEntries(spreadIndex);
+    const v = this.viewer;
+    if (spreadIndex < 0 || spreadIndex >= v.book.numSpreads()) return;
+    const { left, right } = v.book.spreadPageEntries(spreadIndex);
     for (const pageIndex of [left.pageIndex, right.pageIndex]) {
       if (pageIndex < 0) continue;
-      if (app.lazyPageLoader.isPageHighResReady(pageIndex, app.contentZoom)) continue;
-      app.lazyPageLoader.ensurePageHighRes(pageIndex, app.contentZoom);
+      if (v.lazyPageLoader.isPageHighResReady(pageIndex, v.contentZoom)) continue;
+      v.lazyPageLoader.ensurePageHighRes(pageIndex, v.contentZoom);
     }
   }
 
@@ -46,29 +46,22 @@ export class NavigationController {
   }
 
   queueSpreadTurnsTo(targetSpread, preferredPageIndex = null) {
-    const app = this.app;
-    const clampedTarget = Math.max(0, Math.min(targetSpread, app.viewerBook.numSpreads() - 1));
+    const v = this.viewer;
+    const clampedTarget = Math.max(0, Math.min(targetSpread, v.book.numSpreads() - 1));
     const fromSpread = this.getEffectiveSpread();
     const distance = Math.abs(clampedTarget - fromSpread);
-    if (distance <= 1 || !app.lastMargins || !app.viewerBook.pages.length) {
+    if (distance <= 1 || !v.lastMargins || !v.book.pages.length) {
       this.navigateTo(clampedTarget, preferredPageIndex);
       return;
     }
 
     const direction = clampedTarget > fromSpread ? 1 : -1;
-    if (app.spreadRenderer.isAnimating && this.animationDirection && direction !== this.animationDirection) return;
+    if (v.spreadRenderer.isAnimating && this.animationDirection && direction !== this.animationDirection) return;
 
     this.cancelQueuedSpreadTurns();
     const token = this.queuedSpreadTurnToken;
-    // Kick off high-res loading for the FINAL destination spread now,
-    // while the queued turns animate through intermediate low-res spreads.
-    // By the time the user arrives, high-res is already in flight or
-    // resolved.
     this.#kickoffHighResForSpread(clampedTarget);
 
-    // Cap total queued-turn time at MAX_QUEUE_DURATION_MS. For long jumps
-    // we compress both per-turn duration and the inter-turn delay
-    // proportionally so the visual cadence stays consistent.
     const nominalTotal = BASE_TURN_DURATION_MS + (distance - 1) * BASE_MULTI_SPREAD_TURN_INTERVAL_MS;
     const scale = Math.min(1, MAX_QUEUE_DURATION_MS / nominalTotal);
     const stepDurationMs = BASE_TURN_DURATION_MS * scale;
@@ -86,7 +79,6 @@ export class NavigationController {
       this.navigateTo(nextSpread, isFinalStep ? preferredPageIndex : null, {
         fromQueuedJump: true,
         isFinalQueuedStep: isFinalStep,
-        selectPage: isFinalStep,
         durationMs: stepDurationMs,
       });
       if (!isFinalStep) {
@@ -99,98 +91,62 @@ export class NavigationController {
     advance();
   }
 
-  selectSpreadPage(spreadIndex, preferredPageIndex = null) {
-    const app = this.app;
-    if (app.uiState.appMode !== "content" || !app.viewerBook.pages.length) return;
-    const { left, right } = app.viewerBook.spreadPageEntries(spreadIndex);
-    const spreadPageIndexes = [left.pageIndex, right.pageIndex].filter(index => index >= 0);
-    const pageIndex = spreadPageIndexes.includes(preferredPageIndex)
-      ? preferredPageIndex
-      : (left.pageIndex >= 0 ? left.pageIndex : right.pageIndex);
-    if (pageIndex < 0 || pageIndex >= app.viewerBook.pages.length) return;
-    app.placedPreviewManager.endInteractive({ redraw: false });
-    app.placedPreviewManager.flushDirty();
-    app.uiState.editingPageIdx = pageIndex;
-    app.uiState.selectedPageIdxs = new Set([pageIndex]);
-    app.toolbarController.syncPageUI();
-  }
-
   navigateTo(targetSpread, preferredPageIndex = null, options = {}) {
-    const app = this.app;
-    const clampedTarget = Math.max(0, Math.min(targetSpread, app.viewerBook.numSpreads() - 1));
+    const v = this.viewer;
+    const clampedTarget = Math.max(0, Math.min(targetSpread, v.book.numSpreads() - 1));
     if (clampedTarget === this.getEffectiveSpread()) return;
     if (!options.fromQueuedJump) this.cancelQueuedSpreadTurns();
     const fromSpread = this.getEffectiveSpread();
     const direction = clampedTarget > fromSpread ? 1 : -1;
 
-    app.placedPreviewManager.endInteractive({ redraw: false });
-    app.lazyPageLoader.ensureSpreadLoaded(clampedTarget, 1, { allowHighRes: false });
-    if (options.selectPage !== false) this.selectSpreadPage(clampedTarget, preferredPageIndex);
+    v.emit("beforenavigate", { fromSpread, toSpread: clampedTarget, preferredPageIndex });
+    v.lazyPageLoader.ensureSpreadLoaded(clampedTarget, 1, { allowHighRes: false });
 
-    if (!app.lastMargins || !app.viewerBook.pages.length) {
-      app.uiState.currentSpread = clampedTarget;
-      app.uiState.effectiveSpread = clampedTarget;
+    if (!v.lastMargins || !v.book.pages.length) {
+      v.currentSpread = clampedTarget;
+      v.effectiveSpread = clampedTarget;
       this.animationDirection = 0;
-      app.spreadRenderer.stopAnimation();
+      v.spreadRenderer.stopAnimation();
       this.animationCompletionScheduled = false;
-      app.overlayCanvas.style.visibility = "";
-      app.redraw();
+      v.emit("animationend", {});
+      v.emit("spreadchange", { spreadIndex: clampedTarget });
+      v.redraw();
       return;
     }
 
-    if (app.spreadRenderer.isAnimating && this.animationDirection && direction !== this.animationDirection) return;
+    if (v.spreadRenderer.isAnimating && this.animationDirection && direction !== this.animationDirection) return;
     const turnStartToken = ++this.pendingTurnStartToken;
     const startTurn = () => {
       if (this.pendingTurnStartToken !== turnStartToken) return;
 
-      app.uiState.effectiveSpread = clampedTarget;
+      v.effectiveSpread = clampedTarget;
       this.animationDirection = direction;
-      const fromCanvas = app.spreadComposer.createSpreadSnapshot(fromSpread);
-      const toCanvas = app.spreadComposer.createSpreadSnapshot(clampedTarget);
-      app.overlayCanvas.style.visibility = "hidden";
-
-      // Defer LRU evictions while the animation runs — the renderer holds
-      // pinned bitmap refs in its scenes that mustn't be closed mid-flight.
-      app.lazyPageLoader.setEvictionsDeferred(true);
+      const fromCanvas = v.createSpreadSnapshot(fromSpread);
+      const toCanvas = v.createSpreadSnapshot(clampedTarget);
+      v.emit("animationstart", { fromSpread, toSpread: clampedTarget, direction });
+      v.lazyPageLoader.setEvictionsDeferred(true);
 
       const onDone = this.animationCompletionScheduled
         ? null
         : () => {
             this.animationCompletionScheduled = false;
             this.animationDirection = 0;
-            app.uiState.currentSpread = app.uiState.effectiveSpread;
-            app.overlayCanvas.style.visibility = "";
-            // Pages whose bitmaps arrived during the animation had their
-            // placed-preview rebuilds deferred — flush them now that the
-            // turn has settled.
-            app.placedPreviewManager.flushDirty();
-            app.redraw();
-            // Old scenes/textures are no longer referenced after the redraw
-            // builds a fresh scene — safe to evict over-capacity LRU entries.
-            app.lazyPageLoader.flushEvictions();
-            app.schedulePreviewRedraw();
+            v.currentSpread = v.effectiveSpread;
+            v.emit("animationend", {});
+            v.emit("spreadchange", { spreadIndex: v.currentSpread });
+            v.redraw();
+            v.lazyPageLoader.flushEvictions();
+            v.schedulePreviewRedraw();
           };
 
       this.animationCompletionScheduled = true;
-      app.spreadRenderer.animateTo(fromCanvas, toCanvas, direction, onDone, {
+      v.spreadRenderer.animateTo(fromCanvas, toCanvas, direction, onDone, {
         durationMs: options.durationMs,
       });
-      app.schedulePreviewRedraw();
-      app.pageStrip.update(app.viewerBook, {
-        ...app.uiState,
-        selectedPageIdxs: cloneSet(app.uiState.selectedPageIdxs),
-        effectiveSpread: app.uiState.effectiveSpread,
-      });
+      v.schedulePreviewRedraw();
     };
 
-    // High-res preloading: for single-step nav, kick off the destination
-    // spread (both pages) now so it's ready on arrival. For queued jumps,
-    // the queue starter already kicked off the final destination — skip
-    // intermediates so they stay low-res.
-    if (!options.fromQueuedJump) {
-      this.#kickoffHighResForSpread(clampedTarget);
-    }
-
+    if (!options.fromQueuedJump) this.#kickoffHighResForSpread(clampedTarget);
     startTurn();
   }
 }
