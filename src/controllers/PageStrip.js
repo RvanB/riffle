@@ -75,7 +75,10 @@ export class PageStrip {
     const maxScroll = Math.max(0, this.container.scrollWidth - this.container.clientWidth);
     const clamped = Math.max(0, Math.min(maxScroll, target));
     if (Math.abs(clamped - this.container.scrollLeft) < 0.5) return;
-    this.container.scrollTo({ left: clamped, behavior: "smooth" });
+    // Instant scroll so the in-spread thumb stays exactly centered the
+    // moment the highlight class changes — a smooth scroll lags behind and
+    // the highlight appears to "run ahead" before snapping back.
+    this.container.scrollLeft = clamped;
   }
 
   updateThumbnail(pageIndex, page) {

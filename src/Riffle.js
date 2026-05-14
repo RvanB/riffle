@@ -63,8 +63,12 @@ export function Riffle({
     get contentZoom() { return bookViewer.contentZoom; },
     get renderZoom() { return bookViewer.renderZoom; },
     get currentSpread() { return bookViewer.currentSpread; },
+    // The currently-targeted spread including any in-flight animation. Use
+    // this for "where are we heading" reads (e.g., relative navigation).
+    get effectiveSpread() { return bookViewer.navigationController.getEffectiveSpread(); },
     get numSpreads() { return bookViewer.numSpreads; },
     get isAnimating() { return bookViewer.isAnimating; },
+    navigateBy: (delta) => bookViewer.navigateTo(bookViewer.navigationController.getEffectiveSpread() + delta),
     setSource: (s) => bookViewer.setSource(s),
     setLayout: (l) => bookViewer.setLayout(l),
     setDisplay: (d) => bookViewer.setDisplay(d),
@@ -89,6 +93,10 @@ export function Riffle({
       });
     },
   };
-  Object.assign(spreadCanvas, api);
+  // Use defineProperties so getters stay live — Object.assign would
+  // invoke each getter once at copy time and stamp the resulting value,
+  // freezing `numSpreads`/`currentSpread`/etc. at construction-time
+  // values (back when the book was empty).
+  Object.defineProperties(spreadCanvas, Object.getOwnPropertyDescriptors(api));
   return spreadCanvas;
 }

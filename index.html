@@ -34,7 +34,26 @@
       }
       .file-picker input { display: none; }
       .file-picker:hover { background: #333; }
-      #status { color: #888; font-size: 13px; }
+      #page-jump {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          color: #888;
+          font-size: 13px;
+      }
+      #page-input {
+          width: 56px;
+          background: #2a2a2a;
+          color: #ddd;
+          border: 1px solid #444;
+          border-radius: 4px;
+          padding: 4px 6px;
+          font: inherit;
+          text-align: right;
+      }
+      #page-input::-webkit-outer-spin-button,
+      #page-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+      #page-input { -moz-appearance: textfield; }
       .zoom-controls { margin-left: auto; display: flex; gap: 4px; }
       .zoom-controls button {
           width: 32px; height: 32px;
@@ -60,17 +79,24 @@
           flex: 0 0 64px;
           background: #161616;
           border-top: 1px solid #333;
-          overflow-x: auto;
+          overflow: hidden;
           display: flex;
           align-items: center;
           padding: 0 8px;
-          gap: 4px;
       }
-      #strip-container > div { /* the page strip container element */
+      /* The page strip container the library creates. Allow programmatic
+         scrollLeft (PageStrip uses scrollTo to keep the in-spread thumb
+         centered) but hide the scrollbar so the overflow looks clean. */
+      #strip-container > div {
+          flex: 1;
+          align-self: stretch;
+          overflow-x: auto;
+          scrollbar-width: none;        /* Firefox */
           display: flex;
           align-items: center;
           gap: 4px;
       }
+      #strip-container > div::-webkit-scrollbar { display: none; }  /* WebKit */
       .strip-thumb {
           display: inline-flex;
           flex-direction: column;
@@ -100,7 +126,10 @@
         <span>Open PDF</span>
         <input type="file" id="pdf-input" accept="application/pdf" />
       </label>
-      <span id="status"></span>
+      <div id="page-jump">
+        <input id="page-input" type="number" min="1" value="" />
+        <span>of <span id="page-total">—</span></span>
+      </div>
       <div class="zoom-controls">
         <button id="zoom-out" type="button">−</button>
         <button id="zoom-in" type="button">+</button>
@@ -108,28 +137,62 @@
     </header>
     <div id="viewport"></div>
     <div id="strip-container"></div>
+    <script type="importmap">
+      {
+          "imports": {
+              "riffle": "./src/index.js"
+          }
+      }
+    </script>
     <script type="module">
-      import { Riffle, RifflePageStrip } from "https://cdn.jsdelivr.net/gh/RvanB/riffle@v0.1.1/dist/riffle.min.js";
-  
+      import { Riffle, RifflePageStrip } from "riffle";
+
       const viewport = document.getElementById("viewport");
       const stripContainer = document.getElementById("strip-container");
-      const status = document.getElementById("status");
 
       const viewer = Riffle({ paperPreset: "natural" });
       viewport.appendChild(viewer);
       stripContainer.appendChild(RifflePageStrip(viewer));
 
+      const pageInput = document.getElementById("page-input");
+      const pageTotal = document.getElementById("page-total");
+
+      // Page 1 = cover (spread 0, right side). Spread N (≥1) contains
+      // pages 2N (left) and 2N+1 (right). The page input shows the LEFT
+      // page of the current spread (or page 1 for the cover).
+      const pageToSpread = (page) => Math.max(0, Math.floor(page / 2));
+      const spreadToPage = (spread) => spread === 0 ? 1 : spread * 2;
+
+      const refreshPageReadout = () => {
+          const total = viewer.bookViewer.book.pages.length;
+          pageTotal.textContent = total > 0 ? String(total) : "—";
+          pageInput.max = String(Math.max(1, total));
+          if (document.activeElement !== pageInput) {
+              pageInput.value = total > 0 ? String(spreadToPage(viewer.effectiveSpread)) : "";
+          }
+      };
+      viewer.on("sourcechange", refreshPageReadout);
+      viewer.on("spreadchange", refreshPageReadout);
+      viewer.on("effectivespreadchange", refreshPageReadout);
+
+      pageInput.addEventListener("change", () => {
+          const n = Number(pageInput.value);
+          if (!Number.isFinite(n) || n < 1) return;
+          viewer.navigateTo(pageToSpread(n), n - 1);
+      });
+      pageInput.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") pageInput.blur();
+      });
+
       document.getElementById("pdf-input").addEventListener("change", async (event) => {
           const file = event.target.files?.[0];
           event.target.value = "";
           if (!file) return;
-          status.textContent = `Loading ${file.name}…`;
           try {
               await viewer.openPdf(file);
-              status.textContent = `${viewer.numSpreads * 2} pages loaded`;
+              refreshPageReadout();
           } catch (error) {
               console.error(error);
-              status.textContent = `Failed: ${error.message}`;
           }
       });
 
@@ -139,13 +202,11 @@
       window.addEventListener("keydown", (event) => {
           if (event.target.tagName === "INPUT") return;
           if (event.key === "ArrowRight" || event.key === "ArrowDown") {
-              viewer.navigateTo(viewer.currentSpread + 1);
+              viewer.navigateBy(1);
           } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
-              viewer.navigateTo(viewer.currentSpread - 1);
+              viewer.navigateBy(-1);
           }
       });
-
-      status.textContent = "Choose a PDF to begin.";
 
     </script>
   </body>

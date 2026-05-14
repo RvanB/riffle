@@ -108,6 +108,7 @@ export class NavigationController {
       this.animationDirection = 0;
       v.spreadRenderer.stopAnimation();
       this.animationCompletionScheduled = false;
+      v.emit("effectivespreadchange", { spreadIndex: clampedTarget });
       v.emit("animationend", {});
       v.emit("spreadchange", { spreadIndex: clampedTarget });
       v.redraw();
@@ -123,7 +124,6 @@ export class NavigationController {
       this.animationDirection = direction;
       const fromCanvas = v.createSpreadSnapshot(fromSpread);
       const toCanvas = v.createSpreadSnapshot(clampedTarget);
-      v.emit("animationstart", { fromSpread, toSpread: clampedTarget, direction });
       v.lazyPageLoader.setEvictionsDeferred(true);
 
       const onDone = this.animationCompletionScheduled
@@ -143,6 +143,14 @@ export class NavigationController {
       v.spreadRenderer.animateTo(fromCanvas, toCanvas, direction, onDone, {
         durationMs: options.durationMs,
       });
+      // Emit AFTER animateTo so spreadRenderer.isAnimating is true; this is
+      // the moment `getEffectiveSpread()` will return the new target.
+      // Fired at the start of every navigation (including each step of a
+      // queued multi-spread turn) so consumers like the page strip can
+      // scroll-track the in-flight target rather than waiting for the
+      // animation to settle.
+      v.emit("effectivespreadchange", { spreadIndex: clampedTarget });
+      v.emit("animationstart", { fromSpread, toSpread: clampedTarget, direction });
       v.schedulePreviewRedraw();
     };
 
