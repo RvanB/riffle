@@ -16,6 +16,12 @@ export { ViewerPage } from "./model/ViewerPage.js";
 export { WebGPUSpreadRenderer } from "./rendering/WebGPUSpreadRenderer.js";
 export { SpreadRenderer } from "./rendering/SpreadRenderer.js";
 
+// Controllers (for callers who want a lower-level page strip with custom
+// callbacks than RifflePageStrip provides).
+export { PageStrip } from "./controllers/PageStrip.js";
+export { NavigationController } from "./controllers/NavigationController.js";
+export { ZoomController } from "./controllers/ZoomController.js";
+
 // Layout helpers (consumers building their own composition pipelines may
 // need these to align with the renderer's page-rect math).
 export {

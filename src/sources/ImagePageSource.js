@@ -21,13 +21,22 @@ export class ImagePageSource extends PageSource {
     getPageMetadata,
     getPagePreview = null,
     getPageHighRes = null,
+    internalBook = null,
   }) {
     super();
     this._getPageCount = getPageCount;
     this._getPageMetadata = getPageMetadata;
     this._getPagePreview = getPagePreview;
     this._getPageHighRes = getPageHighRes;
+    this._internalBook = internalBook;
   }
+
+  // If the host owns the per-page mutable model that LazyPageLoader writes
+  // to (margin's app.book is the canonical example), pass it via
+  // `internalBook` — the viewer's lazy loader will operate directly on it.
+  // When omitted, the source is bitmap-callback-driven and the viewer won't
+  // try to write into a host-owned book.
+  getInternalBook() { return this._internalBook; }
 
   getPageCount() { return this._getPageCount(); }
   getPageMetadata(index) { return this._getPageMetadata(index); }

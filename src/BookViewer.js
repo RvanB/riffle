@@ -238,17 +238,22 @@ export class BookViewer {
   #onPageReady(pageIndex) {
     const viewerPage = this.book.pages[pageIndex] ?? null;
     if (this.spreadRenderer.isAnimating) {
-      if (viewerPage) this.spreadRenderer.refreshPageSource?.(viewerPage);
+      // Let host code (composition pipelines, thumbnail managers) react to
+      // the fresh bitmap before the renderer reads through ViewerPage's
+      // getter chain.
       this.emit("pageready", { pageIndex, animating: true });
+      if (viewerPage) this.spreadRenderer.refreshPageSource?.(viewerPage);
       return;
     }
+    // Emit first so host listeners can populate composed canvases / placed
+    // previews before the redraw samples ViewerPage.displayCanvas.
+    this.emit("pageready", { pageIndex, animating: false });
     const { left, right } = this.book.spreadPageEntries(this.currentSpread);
     const isOnCurrent = pageIndex === left.pageIndex || pageIndex === right.pageIndex;
     if (isOnCurrent) {
       this.zoomController.applySafeRenderZoom();
       this.redraw();
     }
-    this.emit("pageready", { pageIndex, animating: false });
   }
 
   #loaderBook() {
