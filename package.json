@@ -1,0 +1,14 @@
+{
+  "name": "book-viewer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Page-turning book viewer with show-through translucency. Accepts pre-composed page bitmaps via PageSource.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src",
+    "229-plain-white-paper.webp"
+  ]
+}
