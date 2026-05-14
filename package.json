@@ -1,14 +1,24 @@
 {
-  "name": "book-viewer",
+  "name": "riffle",
   "version": "0.1.0",
-  "private": true,
-  "description": "Page-turning book viewer with show-through translucency. Accepts pre-composed page bitmaps via PageSource.",
+  "description": "Page-turning book viewer with show-through translucency.",
   "type": "module",
+  "main": "dist/riffle.min.js",
+  "module": "dist/riffle.min.js",
   "exports": {
-    ".": "./src/index.js"
+    ".": {
+      "import": "./dist/riffle.min.js",
+      "default": "./src/index.js"
+    }
   },
   "files": [
     "src",
-    "229-plain-white-paper.webp"
-  ]
+    "dist"
+  ],
+  "scripts": {
+    "build": "esbuild src/index.js --bundle --format=esm --minify --sourcemap --outfile=dist/riffle.min.js && esbuild src/loading/pdfWorker.js --bundle --format=esm --minify --sourcemap --outfile=dist/pdfWorker.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.23.0"
+  }
 }

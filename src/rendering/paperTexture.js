@@ -1,8 +1,10 @@
-const PAPER_TEXTURE_URL = new URL("../../229-plain-white-paper.webp", import.meta.url).href;
+// Paper-fiber overlay. Riffle used to ship a 229-plain-white-paper.webp
+// asset for this, but the visual contribution is minimal and the asset
+// dependency complicated bundling. The shader/2D fallback still bind a
+// texture here — we just return a 1×1 white canvas so the math evaluates
+// to a no-op (multiply by 1.0).
 
 let neutralCanvas = null;
-let loadedTextureCanvas = null;
-let loadPromise = null;
 
 function get2dContext(canvas, options) {
   return canvas.getContext("2d", options);
@@ -19,50 +21,14 @@ function getNeutralCanvas() {
   return neutralCanvas;
 }
 
-function imageToCanvas(image) {
-  const canvas = document.createElement("canvas");
-  canvas.width = image.naturalWidth;
-  canvas.height = image.naturalHeight;
-  const ctx = get2dContext(canvas, { willReadFrequently: true });
-  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-  return canvas;
-}
-
 export function getPaperTextureCanvasSync() {
-  return loadedTextureCanvas || getNeutralCanvas();
+  return getNeutralCanvas();
 }
 
 export async function loadPaperTextureCanvas() {
-  if (loadedTextureCanvas) return loadedTextureCanvas;
-  if (!loadPromise) {
-    loadPromise = new Promise(resolve => {
-      const image = new Image();
-      image.onload = () => {
-        loadedTextureCanvas = imageToCanvas(image);
-        resolve(loadedTextureCanvas);
-      };
-      image.onerror = error => {
-        console.error("Failed to load paper texture:", error);
-        loadedTextureCanvas = getNeutralCanvas();
-        resolve(loadedTextureCanvas);
-      };
-      image.src = PAPER_TEXTURE_URL;
-    });
-  }
-  return loadPromise;
+  return getNeutralCanvas();
 }
 
-export function drawPaperTextureOverlay(ctx, rect, textureCanvas = getPaperTextureCanvasSync(), { strength = 0.2 } = {}) {
-  if (!ctx || !rect || rect.w <= 0 || rect.h <= 0 || !textureCanvas) return;
-  ctx.save();
-  ctx.globalCompositeOperation = "multiply";
-  ctx.globalAlpha = strength;
-  ctx.drawImage(
-    textureCanvas,
-    Math.round(rect.x),
-    Math.round(rect.y),
-    Math.round(rect.w),
-    Math.round(rect.h)
-  );
-  ctx.restore();
+export function drawPaperTextureOverlay() {
+  // No-op: the asset that drove the multiply overlay has been removed.
 }
