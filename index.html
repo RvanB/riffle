@@ -34,14 +34,6 @@
       }
       .file-picker input { display: none; }
       .file-picker:hover { background: #333; }
-      .demo-control {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          color: #aaa;
-          font-size: 13px;
-      }
-      .demo-control input[type="checkbox"] { margin: 0; }
       #page-jump {
           display: flex;
           align-items: center;
@@ -138,10 +130,6 @@
         <input id="page-input" type="number" min="1" value="" />
         <span id="spread-readout">pages —</span>
       </div>
-      <label class="demo-control">
-        <input id="flyleaves-toggle" type="checkbox" checked />
-        <span>Flyleaves</span>
-      </label>
       <div class="zoom-controls">
         <button id="zoom-out" type="button">−</button>
         <button id="zoom-in" type="button">+</button>
@@ -161,13 +149,7 @@
 
       const viewport = document.getElementById("viewport");
       const stripContainer = document.getElementById("strip-container");
-      const flyleavesToggle = document.getElementById("flyleaves-toggle");
-      const getFlyleavesOption = () => flyleavesToggle.checked ? { front: 1, back: 1 } : false;
-
-      const viewer = Riffle({
-          paperPreset: "natural",
-          flyleaves: getFlyleavesOption(),
-      });
+      const viewer = Riffle({ paperPreset: "natural" });
       viewport.appendChild(viewer);
       stripContainer.appendChild(RifflePageStrip(viewer));
 
@@ -180,8 +162,7 @@
           if (pageIndex < 0 || pageIndex >= viewer.bookViewer.book.pages.length) return null;
           const sourcePageIndex = viewer.pageIndexToSourcePageIndex(pageIndex);
           if (sourcePageIndex >= 0) return String(sourcePageIndex + 1);
-          const role = viewer.bookViewer.book.pages[pageIndex]?.metadata?.source?.role;
-          return role === "back" || role === "back-extra" ? "back" : "front";
+          return null;
       };
       const spreadLabel = (spread) => {
           const entries = viewer.bookViewer.book.spreadPageEntries(spread);
@@ -216,11 +197,6 @@
       });
       pageInput.addEventListener("keydown", (event) => {
           if (event.key === "Enter") pageInput.blur();
-      });
-
-      flyleavesToggle.addEventListener("change", () => {
-          viewer.setFlyleaves(getFlyleavesOption());
-          refreshPageReadout();
       });
 
       document.getElementById("pdf-input").addEventListener("change", async (event) => {

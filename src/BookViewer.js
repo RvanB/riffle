@@ -2,7 +2,6 @@ import { LazyPageLoader } from "./loading/LazyPageLoader.js";
 import { NavigationController } from "./controllers/NavigationController.js";
 import { ZoomController } from "./controllers/ZoomController.js";
 import { ViewerBook } from "./model/ViewerBook.js";
-import { FlyleafPageSource } from "./sources/FlyleafPageSource.js";
 import { computeMargins } from "./rendering/layout.js";
 import { applyPaperPreset, DEFAULT_PAPER_PRESET_ID } from "./model/paper.js";
 
@@ -34,7 +33,6 @@ export class BookViewer {
     paperTextureStrength = 0.18,
     showPageBorder = true,
     maxHighResPages = 8,
-    flyleaves = true,
   } = {}) {
     if (!spreadCanvas) throw new Error("BookViewer: spreadCanvas is required");
     if (!rendererClass) throw new Error("BookViewer: rendererClass is required");
@@ -56,7 +54,6 @@ export class BookViewer {
       ...display,
     }, paperPreset);
     this.showPageBorder = showPageBorder;
-    this.flyleaves = flyleaves;
     this.currentSpread = 0;
     this.effectiveSpread = 0;
     this.lastMargins = computeMargins(this.layout, 1);
@@ -65,7 +62,6 @@ export class BookViewer {
     this.listeners = new Map();
     this.latestGeometry = null;
     this.source = null;
-    this.rawSource = null;
     this.book = new ViewerBook({ getPageCount: () => 0, getPageMetadata: () => null, on: () => () => {} });
 
     // Renderer + loaders.
@@ -89,16 +85,12 @@ export class BookViewer {
   get viewerBook() { return this.book; }   // alias for legacy host code
 
   setSource(source) {
-    this.rawSource = source;
-    const viewerSource = this.flyleaves
-      ? new FlyleafPageSource(source, typeof this.flyleaves === "object" ? this.flyleaves : undefined)
-      : source;
-    this.source = viewerSource;
-    this.book = new ViewerBook(viewerSource);
+    this.source = source;
+    this.book = new ViewerBook(source);
     // LazyPageLoader operates on a book-shaped object whose pages are mutable
     // (it writes srcCanvas/previewCanvas onto them). We give it the source's
     // own internal book if available, else fall back to a derived passthrough.
-    this.lazyPageLoader.book = viewerSource.getInternalBook?.() ?? this.#loaderBook();
+    this.lazyPageLoader.book = source.getInternalBook?.() ?? this.#loaderBook();
     this.currentSpread = 0;
     this.effectiveSpread = 0;
     this.lazyPageLoader.reset();
@@ -119,16 +111,6 @@ export class BookViewer {
   setDisplay(display) {
     this.display = { ...this.display, ...display };
     this.redraw();
-  }
-
-  setFlyleaves(flyleaves) {
-    this.flyleaves = flyleaves;
-    if (this.rawSource) {
-      this.setSource(this.rawSource);
-    } else {
-      this.redraw();
-      this.emit("sourcechange", { source: null });
-    }
   }
 
   setShowPageBorder(show) {
@@ -195,6 +177,7 @@ export class BookViewer {
         showPlaceholder: !this.book.pages.length,
         previewZoom: this.renderZoom,
         showPageBorder: this.showPageBorder,
+        pageCount: this.book.pages.length,
       }
     );
     this.latestGeometry = {
@@ -248,7 +231,7 @@ export class BookViewer {
       margins,
       { left: { pipeline: [], key: "" }, right: { pipeline: [], key: "" } },
       this.display,
-      { previewZoom: this.renderZoom, showPageBorder: this.showPageBorder },
+      { previewZoom: this.renderZoom, showPageBorder: this.showPageBorder, pageCount: this.book.pages.length },
     );
     return canvas;
   }

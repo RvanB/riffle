@@ -195,7 +195,7 @@ export class SpreadRenderer {
   #paint(targetCanvas, pages, margins, effects, display, options = {}) {
     const ctx = get2dContext(targetCanvas);
     const hasPlacedPages = !!pages;
-    const sideStates = this.#buildSideStates(margins, pages, hasPlacedPages);
+    const sideStates = this.#buildSideStates(margins, pages, hasPlacedPages, options.pageCount ?? 0);
 
     ctx.clearRect(0, 0, targetCanvas.width, targetCanvas.height);
 
@@ -232,8 +232,9 @@ export class SpreadRenderer {
         }
       }
 
-      for (const sideState of Object.values(sideStates)) {
-        if (!sideState.page) continue;
+      for (const [sideName, sideState] of Object.entries(sideStates)) {
+        const oppositeSide = sideName === "left" ? "right" : "left";
+        if (!sideState.page || sideState.isEndPage || !sideStates[oppositeSide]?.page) continue;
         drawDirectionalLightFalloff(
           ctx,
           sideState.pageRect,
@@ -265,7 +266,7 @@ export class SpreadRenderer {
     };
   }
 
-  #buildSideStates(margins, pages, hasPlacedPages) {
+  #buildSideStates(margins, pages, hasPlacedPages, pageCount = 0) {
     const build = (sideName, entry) => {
       const page = entry?.page ?? null;
       const geometry = getPageGeometry(
@@ -274,13 +275,17 @@ export class SpreadRenderer {
         page,
         sideName === "left" ? 0 : margins.pagePxW
       );
+      const pageIndex = entry?.pageIndex ?? -1;
       const isBlank = hasPlacedPages && !page;
+      const hasBackCoverLeaf = pageCount % 2 === 0;
+      const isEndPage = !!page && pageIndex >= 0 && pageCount > 0 && (pageIndex < 2 || (hasBackCoverLeaf && pageIndex >= pageCount - 2));
 
       return {
         side: sideName,
         page,
-        pageIndex: entry?.pageIndex ?? -1,
+        pageIndex,
         isBlank,
+        isEndPage,
         ...geometry,
         overlayVisible: !isBlank && geometry.overlayVisible,
         drawnRect: null,

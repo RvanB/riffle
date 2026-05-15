@@ -56,7 +56,7 @@ function setBackendName(name) {
   document.documentElement.dataset.rendererBackend = name;
 }
 
-function buildSideStates(margins, pages, hasPlacedPages) {
+function buildSideStates(margins, pages, hasPlacedPages, pageCount = 0) {
   const build = (sideName, entry) => {
     const page = entry?.page ?? null;
     const showThroughPage = entry?.showThroughPage ?? null;
@@ -66,7 +66,10 @@ function buildSideStates(margins, pages, hasPlacedPages) {
       page,
       sideName === "left" ? 0 : margins.pagePxW
     );
+    const pageIndex = entry?.pageIndex ?? -1;
     const isBlank = hasPlacedPages && !page;
+    const hasBackCoverLeaf = pageCount % 2 === 0;
+    const isEndPage = !!page && pageIndex >= 0 && pageCount > 0 && (pageIndex < 2 || (hasBackCoverLeaf && pageIndex >= pageCount - 2));
 
     // Pin source-canvas references at scene-build time. The WebGPU renderer
     // caches scaled page-surface canvases keyed by source-canvas identity;
@@ -77,7 +80,7 @@ function buildSideStates(margins, pages, hasPlacedPages) {
     return {
       side: sideName,
       page,
-      pageIndex: entry?.pageIndex ?? -1,
+      pageIndex,
       showThroughPage,
       showThroughEffectEntry: entry?.showThroughEffectEntry ?? { pipeline: [], key: "" },
       surfaceSource: page?.displayCanvas ?? null,
@@ -88,6 +91,7 @@ function buildSideStates(margins, pages, hasPlacedPages) {
       showThroughSurfaceSource: showThroughPage?.rawPreviewCanvas ?? showThroughPage?.thumbnailSourceCanvas ?? null,
       backFaceSurfaceSource: showThroughPage?.rawDisplayCanvas ?? showThroughPage?.thumbnailSourceCanvas ?? null,
       isBlank,
+      isEndPage,
       ...geometry,
       overlayVisible: !isBlank && geometry.overlayVisible,
       drawnRect: null,
@@ -962,6 +966,7 @@ export class WebGPUSpreadRenderer {
                 let selected = matchesSelection(content);
                 content = applyBlackAndWhite(content, selected);
                 content = applyLevels(content, selected);
+                let hasFacingPage = uniforms.params.x > 0.5;
                 let turnFactor = clamp(1.0 - abs(normal.z), 0.0, 1.0);
                 let composited = mix(paper, applyBlendMode(paper, content), visibleTexel.a);
                 var lit = srgbToLinear(composited);
@@ -982,8 +987,12 @@ export class WebGPUSpreadRenderer {
                   sqrt(max(0.0001, 1.0 - curveTilt * curveTilt))
                 ));
                 let curvedNormal = normalize((uniforms.model * vec4<f32>(curvedLocal * uniforms.params.z, 0.0)).xyz);
+                let flatNormal = normal * select(-1.0, 1.0, frontVisible);
+                var lightingNormal = curvedNormal * select(-1.0, 1.0, frontVisible);
+                if (!hasFacingPage) {
+                  lightingNormal = flatNormal;
+                }
                 let lightDir = vec3<f32>(0.0, 0.0, 1.0);
-                let lightingNormal = curvedNormal * select(-1.0, 1.0, frontVisible);
                 let diffuse = max(dot(lightingNormal, lightDir), 0.0);
                 let lightTint = mix(
                   srgbToLinear(uniforms.lightShadowColor.rgb),
@@ -1046,7 +1055,7 @@ export class WebGPUSpreadRenderer {
                 let directShaded = lit * lightTint * shadowTint * attenuation * bounce * highlightBalance * paperLighting + scatter;
                 let withShowThrough = directShaded * mix(vec3<f32>(1.0, 1.0, 1.0), hiddenLin, transmittance);
                 var shadedLinear = withShowThrough;
-                if (uniforms.params.x > 0.5) {
+                if (hasFacingPage) {
                   let outerReach = mix(0.014, 0.022, turnFactor);
                   let outerCrack = 1.0 - smoothstep(0.0, outerReach, pageHingeDist);
                   let outerMask = min(1.0, (0.24 + 0.08 * turnFactor) * pow(outerCrack, 1.2));
@@ -1245,7 +1254,7 @@ export class WebGPUSpreadRenderer {
     const previewZoom = Math.max(1, options.previewZoom || 1);
     const showPageBorder = options.showPageBorder !== false;
     const hasPlacedPages = !!pages;
-    const sideStates = buildSideStates(margins, pages, hasPlacedPages);
+    const sideStates = buildSideStates(margins, pages, hasPlacedPages, options.pageCount ?? 0);
 
     for (const sideName of ["left", "right"]) {
       const sideState = sideStates[sideName];
@@ -1482,7 +1491,9 @@ export class WebGPUSpreadRenderer {
     uniformData.set(modelMatrix, 0);
     uniformData.set([light.x, light.y, light.z, 1], 16);
     uniformData.set([this.canvas.width, this.canvas.height, -this.canvas.width, this.canvas.width], 20);
-    uniformData.set([1, hingeOnRight ? 1 : 0, normalSign, flipX ? 1 : 0], 24);
+    const oppositeSide = side === "left" ? "right" : "left";
+    const hasFacingPage = !!scene.sideStates[oppositeSide]?.page && !sideState.isEndPage;
+    uniformData.set([hasFacingPage ? 1 : 0, hingeOnRight ? 1 : 0, normalSign, flipX ? 1 : 0], 24);
     const paperThickness = Math.max(0, Math.min(1, scene.display.paperThickness ?? 0.5));
     const paperTextureStrength = Math.max(0, Math.min(1, scene.display.paperTextureStrength ?? 0.2));
     uniformData.set([occluders.length, ignoreOccluderId, paperThickness, paperTextureStrength], 28);
@@ -1547,22 +1558,79 @@ export class WebGPUSpreadRenderer {
   }
 
   #getPageSurfaceCanvas(scene, sideState, side) {
-    return this.#getRenderedPageSurfaceCanvas(scene, sideState, sideState.surfaceSource, this.pageSurfaceCache);
+    return this.#getRenderedPageSurfaceCanvas(scene, sideState, side, sideState.surfaceSource, this.pageSurfaceCache);
   }
 
   #getTranslucencySurfaceCanvas(scene, sideState, side) {
     const sourceCanvas = sideState?.translucencySource ?? null;
     if (!sourceCanvas) return this.emptyShowThroughCanvas;
-    return this.#getRenderedPageSurfaceCanvas(scene, sideState, sourceCanvas, this.translucencySurfaceCache);
+    return this.#getRenderedPageSurfaceCanvas(scene, sideState, side, sourceCanvas, this.translucencySurfaceCache);
   }
 
-  // Page composition (content placement, crop, fit, align) lives in the
-  // app's PageComposer now. The source canvas arrives here already at
-  // page-rect proportions, so this is just a passthrough — the WebGPU
-  // shader samples the bitmap directly onto the page geometry.
-  #getRenderedPageSurfaceCanvas(_scene, sideState, sourceCanvas, _cacheStore) {
+  #getRenderedPageSurfaceCanvas(scene, sideState, side, sourceCanvas, cacheStore) {
     if (!sideState?.page || !sourceCanvas) return null;
-    return sourceCanvas;
+    const pageAspect = sideState.pageRect.w / sideState.pageRect.h;
+    const sourceAspect = sourceCanvas.width / sourceCanvas.height;
+    if (Math.abs(pageAspect - sourceAspect) < 0.001) return sourceCanvas;
+
+    let pageCache = cacheStore.get(sideState.page);
+    if (!pageCache || pageCache.srcCanvas !== sourceCanvas) {
+      pageCache = {
+        srcCanvas: sourceCanvas,
+        variants: new Map(),
+      };
+      cacheStore.set(sideState.page, pageCache);
+    }
+
+    const effectKey = scene.effects[side]?.key || "";
+    const crop = sideState.page.getCropFor(sourceCanvas);
+    const drawKey = [
+      Math.round(sideState.pageRect.w),
+      Math.round(sideState.pageRect.h),
+      Math.round(scene.margins.pagePxW),
+      Math.round(scene.margins.pagePxH),
+      Math.round(scene.margins.innerPx),
+      Math.round(scene.margins.outerPx),
+      Math.round(scene.margins.topPx),
+      Math.round(scene.margins.bottomPx),
+      Math.round(scene.margins.twPx),
+      Math.round(scene.margins.thPx),
+      side,
+      crop.left,
+      crop.top,
+      crop.right,
+      crop.bottom,
+      sideState.page.cover ? "1" : "0",
+      sideState.page.spread ? "1" : "0",
+      sideState.page.fitAxis || "",
+      sideState.page.contentAlignX || "",
+      sideState.page.contentAlignY || "",
+      effectKey,
+    ].join("|");
+
+    const cached = pageCache.variants.get(drawKey);
+    if (cached) return cached;
+
+    const surface = this.helperRenderer.getPlacedPagePreview(
+      sideState.page,
+      scene.effects[side],
+      scene.display,
+      {
+        sourceCanvas,
+        margins: scene.margins,
+        side,
+        pageHeight: Math.max(1, Math.round(sideState.pageRect.h)),
+        includePageColor: false,
+      }
+    );
+
+    this.#markCanvasDirty(surface);
+    pageCache.variants.set(drawKey, surface);
+    if (pageCache.variants.size > 8) {
+      const oldestKey = pageCache.variants.keys().next().value;
+      pageCache.variants.delete(oldestKey);
+    }
+    return surface;
   }
 
   #getShowThroughSurfaceCanvas(scene, sideState, side) {
