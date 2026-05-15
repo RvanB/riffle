@@ -2,6 +2,7 @@ import { LazyPageLoader } from "./loading/LazyPageLoader.js";
 import { NavigationController } from "./controllers/NavigationController.js";
 import { ZoomController } from "./controllers/ZoomController.js";
 import { ViewerBook } from "./model/ViewerBook.js";
+import { FlyleafPageSource } from "./sources/FlyleafPageSource.js";
 import { computeMargins } from "./rendering/layout.js";
 import { applyPaperPreset, DEFAULT_PAPER_PRESET_ID } from "./model/paper.js";
 
@@ -33,6 +34,7 @@ export class BookViewer {
     paperTextureStrength = 0.18,
     showPageBorder = true,
     maxHighResPages = 8,
+    flyleaves = true,
   } = {}) {
     if (!spreadCanvas) throw new Error("BookViewer: spreadCanvas is required");
     if (!rendererClass) throw new Error("BookViewer: rendererClass is required");
@@ -54,6 +56,7 @@ export class BookViewer {
       ...display,
     }, paperPreset);
     this.showPageBorder = showPageBorder;
+    this.flyleaves = flyleaves;
     this.currentSpread = 0;
     this.effectiveSpread = 0;
     this.lastMargins = computeMargins(this.layout, 1);
@@ -85,12 +88,15 @@ export class BookViewer {
   get viewerBook() { return this.book; }   // alias for legacy host code
 
   setSource(source) {
-    this.source = source;
-    this.book = new ViewerBook(source);
+    const viewerSource = this.flyleaves
+      ? new FlyleafPageSource(source, typeof this.flyleaves === "object" ? this.flyleaves : undefined)
+      : source;
+    this.source = viewerSource;
+    this.book = new ViewerBook(viewerSource);
     // LazyPageLoader operates on a book-shaped object whose pages are mutable
     // (it writes srcCanvas/previewCanvas onto them). We give it the source's
     // own internal book if available, else fall back to a derived passthrough.
-    this.lazyPageLoader.book = source.getInternalBook?.() ?? this.#loaderBook();
+    this.lazyPageLoader.book = viewerSource.getInternalBook?.() ?? this.#loaderBook();
     this.currentSpread = 0;
     this.effectiveSpread = 0;
     this.lazyPageLoader.reset();

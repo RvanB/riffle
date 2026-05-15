@@ -128,7 +128,7 @@
       </label>
       <div id="page-jump">
         <input id="page-input" type="number" min="1" value="" />
-        <span>of <span id="page-total">—</span></span>
+        <span id="spread-readout">pages —</span>
       </div>
       <div class="zoom-controls">
         <button id="zoom-out" type="button">−</button>
@@ -150,22 +150,33 @@
       const viewport = document.getElementById("viewport");
       const stripContainer = document.getElementById("strip-container");
 
-      const viewer = Riffle({ paperPreset: "natural" });
+      const viewer = Riffle({ paperPreset: "natural", flyleaves: { front: 1, back: 1 } });
       viewport.appendChild(viewer);
       stripContainer.appendChild(RifflePageStrip(viewer));
 
       const pageInput = document.getElementById("page-input");
-      const pageTotal = document.getElementById("page-total");
+      const spreadReadout = document.getElementById("spread-readout");
 
-      // Page 1 = cover (spread 0, right side). Spread N (≥1) contains
-      // pages 2N (left) and 2N+1 (right). The page input shows the LEFT
-      // page of the current spread (or page 1 for the cover).
-      const pageToSpread = (page) => Math.max(0, Math.floor(page / 2));
-      const spreadToPage = (spread) => spread === 0 ? 1 : spread * 2;
+      const pageToSpread = (page) => viewer.spreadIndexForSourcePage(page - 1);
+      const spreadToPage = (spread) => viewer.primarySourcePageIndexForSpread(spread) + 1;
+      const pageLabel = (pageIndex) => {
+          if (pageIndex < 0) return null;
+          const sourcePageIndex = viewer.pageIndexToSourcePageIndex(pageIndex);
+          if (sourcePageIndex >= 0) return String(sourcePageIndex + 1);
+          const role = viewer.bookViewer.book.pages[pageIndex]?.metadata?.source?.role;
+          return role === "back" || role === "back-extra" ? "back" : "front";
+      };
+      const spreadLabel = (spread) => {
+          const entries = viewer.bookViewer.book.spreadPageEntries(spread);
+          const labels = [pageLabel(entries.left.pageIndex), pageLabel(entries.right.pageIndex)].filter(Boolean);
+          return labels.length ? labels.join("-") : "-";
+      };
 
       const refreshPageReadout = () => {
-          const total = viewer.bookViewer.book.pages.length;
-          pageTotal.textContent = total > 0 ? String(total) : "—";
+          const total = viewer.sourcePageCount();
+          spreadReadout.textContent = total > 0
+              ? `pages ${spreadLabel(viewer.effectiveSpread)} of ${total}`
+              : "pages —";
           pageInput.max = String(Math.max(1, total));
           if (document.activeElement !== pageInput) {
               pageInput.value = total > 0 ? String(spreadToPage(viewer.effectiveSpread)) : "";
@@ -178,7 +189,9 @@
       pageInput.addEventListener("change", () => {
           const n = Number(pageInput.value);
           if (!Number.isFinite(n) || n < 1) return;
-          viewer.navigateTo(pageToSpread(n), n - 1);
+          const spread = pageToSpread(n);
+          if (spread < 0) return;
+          viewer.navigateTo(spread, viewer.sourcePageIndexToPageIndex(n - 1));
       });
       pageInput.addEventListener("keydown", (event) => {
           if (event.key === "Enter") pageInput.blur();

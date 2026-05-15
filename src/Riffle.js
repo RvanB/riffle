@@ -34,6 +34,7 @@ export function Riffle({
   paperTextureStrength,
   showPageBorder = true,
   maxHighResPages = 8,
+  flyleaves = true,
   viewport = null,
 } = {}) {
   const spreadCanvas = document.createElement("canvas");
@@ -55,6 +56,7 @@ export function Riffle({
     paperTextureStrength,
     showPageBorder,
     maxHighResPages,
+    flyleaves,
   });
 
   const api = {
@@ -75,6 +77,13 @@ export function Riffle({
     setViewport: (el) => bookViewer.setViewport(el),
     setShowPageBorder: (b) => bookViewer.setShowPageBorder(b),
     navigateTo: (s, p) => bookViewer.navigateTo(s, p),
+    spreadIndexForPage: (pageIndex) => bookViewer.book.spreadIndexForPage(pageIndex),
+    primaryPageIndexForSpread: (spreadIndex) => bookViewer.book.primaryPageIndexForSpread(spreadIndex),
+    sourcePageCount: () => bookViewer.book.sourcePageCount(),
+    sourcePageIndexToPageIndex: (sourcePageIndex) => bookViewer.book.sourcePageIndexToPageIndex(sourcePageIndex),
+    pageIndexToSourcePageIndex: (pageIndex) => bookViewer.book.pageIndexToSourcePageIndex(pageIndex),
+    spreadIndexForSourcePage: (sourcePageIndex) => bookViewer.book.spreadIndexForSourcePage(sourcePageIndex),
+    primarySourcePageIndexForSpread: (spreadIndex) => bookViewer.book.primarySourcePageIndexForSpread(spreadIndex),
     adjustZoom: (d) => bookViewer.adjustZoom(d),
     resetZoom: () => bookViewer.resetZoom(),
     redraw: () => bookViewer.redraw(),

@@ -18,8 +18,7 @@ export function RifflePageStrip(viewer) {
   const bookViewer = viewer.bookViewer ?? viewer;
   const pageStrip = new PageStrip(container, {
     onPageClick: (pageIndex) => {
-      const targetSpread = Math.floor((pageIndex + 1) / 2);
-      bookViewer.navigateTo(targetSpread, pageIndex);
+      bookViewer.navigateTo(bookViewer.book.spreadIndexForPage(pageIndex), pageIndex);
     },
     getEffectEntry: () => ({ pipeline: [], key: "" }),
     getDisplay: () => bookViewer.display,

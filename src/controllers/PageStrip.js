@@ -40,8 +40,9 @@ export class PageStrip {
     while (this.thumbs.length > book.pages.length) this.#popThumb();
 
     const spread = uiState.effectiveSpread;
-    const leftIndex = spread * 2 - 1;
-    const rightIndex = spread * 2;
+    const entries = book.spreadPageEntries?.(spread);
+    const leftIndex = entries?.left?.pageIndex ?? -1;
+    const rightIndex = entries?.right?.pageIndex ?? -1;
 
     book.pages.forEach((page, index) => {
       const record = this.thumbs[index];

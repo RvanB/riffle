@@ -29,19 +29,63 @@ export class ViewerBook {
   }
 
   numSpreads() {
+    if (typeof this.source.numSpreads === "function") return this.source.numSpreads();
     return Math.max(1, Math.ceil((this.pages.length + 1) / 2));
   }
 
   spreadPages(spreadIndex) {
-    const leftIndex = spreadIndex * 2 - 1;
-    const rightIndex = spreadIndex * 2;
-    return [
-      leftIndex >= 0 ? this.pages[leftIndex] ?? null : null,
-      this.pages[rightIndex] ?? null,
-    ];
+    const entries = this.spreadPageEntries(spreadIndex);
+    return [entries.left.page, entries.right.page];
+  }
+
+  sourcePageCount() {
+    return this.source.getSourcePageCount?.() ?? this.pages.length;
+  }
+
+  sourcePageIndexToPageIndex(sourcePageIndex) {
+    if (sourcePageIndex < 0 || sourcePageIndex >= this.sourcePageCount()) return -1;
+    return this.source.sourcePageIndexToPageIndex?.(sourcePageIndex) ?? sourcePageIndex;
+  }
+
+  pageIndexToSourcePageIndex(pageIndex) {
+    if (pageIndex < 0 || pageIndex >= this.pages.length) return -1;
+    return this.source.pageIndexToSourcePageIndex?.(pageIndex) ?? pageIndex;
+  }
+
+  spreadIndexForSourcePage(sourcePageIndex) {
+    return this.spreadIndexForPage(this.sourcePageIndexToPageIndex(sourcePageIndex));
+  }
+
+  spreadIndexForPage(pageIndex) {
+    if (pageIndex < 0 || pageIndex >= this.pages.length) return -1;
+    const spreadCount = this.numSpreads();
+    for (let spreadIndex = 0; spreadIndex < spreadCount; spreadIndex += 1) {
+      const entries = this.spreadPageEntries(spreadIndex);
+      if (entries.left.pageIndex === pageIndex || entries.right.pageIndex === pageIndex) return spreadIndex;
+    }
+    return -1;
+  }
+
+  primaryPageIndexForSpread(spreadIndex) {
+    const entries = this.spreadPageEntries(spreadIndex);
+    if (entries.left.pageIndex >= 0) return entries.left.pageIndex;
+    if (entries.right.pageIndex >= 0) return entries.right.pageIndex;
+    return -1;
+  }
+
+  primarySourcePageIndexForSpread(spreadIndex) {
+    const entries = this.spreadPageEntries(spreadIndex);
+    for (const pageIndex of [entries.left.pageIndex, entries.right.pageIndex]) {
+      const sourcePageIndex = this.pageIndexToSourcePageIndex(pageIndex);
+      if (sourcePageIndex >= 0) return sourcePageIndex;
+    }
+    return -1;
   }
 
   spreadPageEntries(spreadIndex) {
+    if (typeof this.source.spreadPageEntries === "function") {
+      return this.#hydrateSpreadEntries(this.source.spreadPageEntries(spreadIndex));
+    }
     const leftIndex = spreadIndex * 2 - 1;
     const rightIndex = spreadIndex * 2;
     const leftShowThroughIndex = leftIndex - 1;
@@ -59,6 +103,22 @@ export class ViewerBook {
         pageIndex: rightIndex,
         showThroughPage: this.pages[rightShowThroughIndex] ?? null,
       },
+    };
+  }
+
+  #hydrateSpreadEntries(entries) {
+    const hydrate = entry => {
+      const pageIndex = entry?.pageIndex ?? -1;
+      const showThroughPageIndex = entry?.showThroughPageIndex ?? -1;
+      return {
+        ...entry,
+        page: pageIndex >= 0 ? this.pages[pageIndex] ?? null : null,
+        showThroughPage: showThroughPageIndex >= 0 ? this.pages[showThroughPageIndex] ?? null : null,
+      };
+    };
+    return {
+      left: hydrate(entries?.left),
+      right: hydrate(entries?.right),
     };
   }
 }

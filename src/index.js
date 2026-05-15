@@ -7,6 +7,7 @@ export { BookViewer } from "./BookViewer.js";
 export { PageSource } from "./sources/PageSource.js";
 export { ImagePageSource } from "./sources/ImagePageSource.js";
 export { PdfPageSource } from "./sources/PdfPageSource.js";
+export { FlyleafPageSource } from "./sources/FlyleafPageSource.js";
 
 // Models
 export { ViewerBook } from "./model/ViewerBook.js";
