@@ -198,10 +198,18 @@ export class SpreadRenderer {
     const sideStates = this.#buildSideStates(margins, pages, hasPlacedPages);
 
     ctx.clearRect(0, 0, targetCanvas.width, targetCanvas.height);
-    ctx.fillStyle = display.paperColor;
-    ctx.fillRect(0, 0, margins.pagePxW * 2, margins.pagePxH);
 
     if (margins.ok) {
+      ctx.fillStyle = display.paperColor;
+      for (const sideState of Object.values(sideStates)) {
+        if (!sideState.page) continue;
+        ctx.fillRect(
+          Math.round(sideState.pageRect.x),
+          Math.round(sideState.pageRect.y),
+          Math.round(sideState.pageRect.w),
+          Math.round(sideState.pageRect.h)
+        );
+      }
       for (const [sideName, sideState] of Object.entries(sideStates)) {
         const effectEntry = effects[sideName];
         if (sideState.page) {
@@ -224,18 +232,22 @@ export class SpreadRenderer {
         }
       }
 
-      drawDirectionalLightFalloff(
-        ctx,
-        { x: 0, y: 0, w: margins.pagePxW * 2, h: margins.pagePxH },
-        {
-          paperColor: display.paperColor,
-          shadowTintColor: display.shadowTintColor,
-        }
-      );
+      for (const sideState of Object.values(sideStates)) {
+        if (!sideState.page) continue;
+        drawDirectionalLightFalloff(
+          ctx,
+          sideState.pageRect,
+          {
+            paperColor: display.paperColor,
+            shadowTintColor: display.shadowTintColor,
+          }
+        );
+      }
       const paperTextureStrength = Math.max(0, Math.min(1, display.paperTextureStrength ?? 0.2));
       if (paperTextureStrength > 0.0001) {
-        drawPaperTextureOverlay(ctx, sideStates.left.pageRect, this.paperTextureCanvas, { strength: paperTextureStrength });
-        drawPaperTextureOverlay(ctx, sideStates.right.pageRect, this.paperTextureCanvas, { strength: paperTextureStrength });
+        for (const sideState of Object.values(sideStates)) {
+          if (sideState.page) drawPaperTextureOverlay(ctx, sideState.pageRect, this.paperTextureCanvas, { strength: paperTextureStrength });
+        }
       }
     }
 

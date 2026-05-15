@@ -1817,10 +1817,10 @@ export class WebGPUSpreadRenderer {
       colorAttachments: [{
         view: targetView,
         clearValue: {
-          r: this.clearColor[0],
-          g: this.clearColor[1],
-          b: this.clearColor[2],
-          a: this.clearColor[3],
+          r: clearColor ? 0 : this.clearColor[0],
+          g: clearColor ? 0 : this.clearColor[1],
+          b: clearColor ? 0 : this.clearColor[2],
+          a: clearColor ? 0 : this.clearColor[3],
         },
         loadOp: clearColor ? "clear" : "load",
         storeOp: "store",

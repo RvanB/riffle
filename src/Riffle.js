@@ -74,6 +74,7 @@ export function Riffle({
     setSource: (s) => bookViewer.setSource(s),
     setLayout: (l) => bookViewer.setLayout(l),
     setDisplay: (d) => bookViewer.setDisplay(d),
+    setFlyleaves: (f) => bookViewer.setFlyleaves(f),
     setViewport: (el) => bookViewer.setViewport(el),
     setShowPageBorder: (b) => bookViewer.setShowPageBorder(b),
     navigateTo: (s, p) => bookViewer.navigateTo(s, p),

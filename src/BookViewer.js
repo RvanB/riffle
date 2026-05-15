@@ -65,6 +65,7 @@ export class BookViewer {
     this.listeners = new Map();
     this.latestGeometry = null;
     this.source = null;
+    this.rawSource = null;
     this.book = new ViewerBook({ getPageCount: () => 0, getPageMetadata: () => null, on: () => () => {} });
 
     // Renderer + loaders.
@@ -88,6 +89,7 @@ export class BookViewer {
   get viewerBook() { return this.book; }   // alias for legacy host code
 
   setSource(source) {
+    this.rawSource = source;
     const viewerSource = this.flyleaves
       ? new FlyleafPageSource(source, typeof this.flyleaves === "object" ? this.flyleaves : undefined)
       : source;
@@ -117,6 +119,16 @@ export class BookViewer {
   setDisplay(display) {
     this.display = { ...this.display, ...display };
     this.redraw();
+  }
+
+  setFlyleaves(flyleaves) {
+    this.flyleaves = flyleaves;
+    if (this.rawSource) {
+      this.setSource(this.rawSource);
+    } else {
+      this.redraw();
+      this.emit("sourcechange", { source: null });
+    }
   }
 
   setShowPageBorder(show) {
