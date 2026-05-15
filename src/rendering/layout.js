@@ -62,7 +62,7 @@ export function getPageGeometry(margins, sideName, page, pageRectX = 0) {
   const isSpread = !!page?.spread && !isCover;
   const effectiveAlignX = page?.contentAlignX
     || (isSpread ? (isLeft ? "right" : "left") : "center");
-  const effectiveAlignY = page?.contentAlignY || "center";
+  const effectiveAlignY = page?.contentAlignY || "top";
   const overlayRect = isSpread
     ? {
         x: isLeft ? textblockRect.x : pageRect.x,
