@@ -1,14 +1,17 @@
 # Riffle
 
-Riffle is a browser book viewer for page bitmaps and PDFs. It renders a two-page spread with animated page turns, paper lighting, translucency, show-through, WebGPU when available, and a 2D canvas fallback.
+Riffle is a browser book viewer for page bitmaps and PDFs. It renders a two-page spread with animated page turns with paper lighting and translucency.
 
 The library returns plain DOM elements and does not impose wrappers or app layout. You decide where the canvas lives, how it scrolls, and how the optional page strip is styled.
+
+- [Live demo](https://rvanb.github.io/riffle.js/)
+- [API reference](https://rvanb.github.io/riffle.js/docs/)
 
 ![Riffle viewer screenshot](https://media.githubusercontent.com/media/RvanB/riffle.js/refs/heads/main/artifacts/riffle.png)
 
 ## Quick Start
 
-A complete, paste-and-run HTML file:
+A minimal, paste-and-run HTML file:
 
 ```html
 <!DOCTYPE html>
@@ -51,14 +54,4 @@ A complete, paste-and-run HTML file:
 </html>
 ```
 
-Two things the library leaves to you:
 
-- **Size the viewport.** The canvas reads its parent (or nearest scrollable ancestor) to compute its dimensions; give that element an explicit width/height. Pass `Riffle({ viewport: el })` to override the lookup.
-- **Lay out the page strip.** `RifflePageStrip` returns an empty `<div>` that fills with one child per page — apply your own flex/grid styling to it.
-
-`dist/pdfWorker.js` must sit next to `dist/riffle.min.js` at runtime. The CDN build resolves it from the same URL path as the library bundle.
-
-## Documentation
-
-- [API reference](https://rvanb.github.io/riffle.js/docs/)
-- [Live demo](https://rvanb.github.io/riffle.js/)

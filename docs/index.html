@@ -66,11 +66,15 @@
 
     <section class="readme usertext">
         <article><h1>Riffle</h1>
-<p>Riffle is a browser book viewer for page bitmaps and PDFs. It renders a two-page spread with animated page turns, paper lighting, translucency, show-through, WebGPU when available, and a 2D canvas fallback.</p>
+<p>Riffle is a browser book viewer for page bitmaps and PDFs. It renders a two-page spread with animated page turns with paper lighting and translucency.</p>
 <p>The library returns plain DOM elements and does not impose wrappers or app layout. You decide where the canvas lives, how it scrolls, and how the optional page strip is styled.</p>
+<ul>
+<li><a href="https://rvanb.github.io/riffle.js/">Live demo</a></li>
+<li><a href="https://rvanb.github.io/riffle.js/docs/">API reference</a></li>
+</ul>
 <p><img src="https://media.githubusercontent.com/media/RvanB/riffle.js/refs/heads/main/artifacts/riffle.png" alt="Riffle viewer screenshot"></p>
 <h2>Quick Start</h2>
-<p>A complete, paste-and-run HTML file:</p>
+<p>A minimal, paste-and-run HTML file:</p>
 <pre class="prettyprint source lang-html"><code>&lt;!DOCTYPE html>
 &lt;html lang=&quot;en&quot;>
   &lt;head>
@@ -109,18 +113,7 @@
     &lt;/script>
   &lt;/body>
 &lt;/html>
-</code></pre>
-<p>Two things the library leaves to you:</p>
-<ul>
-<li><strong>Size the viewport.</strong> The canvas reads its parent (or nearest scrollable ancestor) to compute its dimensions; give that element an explicit width/height. Pass <code>Riffle({ viewport: el })</code> to override the lookup.</li>
-<li><strong>Lay out the page strip.</strong> <code>RifflePageStrip</code> returns an empty <code>&lt;div&gt;</code> that fills with one child per page — apply your own flex/grid styling to it.</li>
-</ul>
-<p><code>dist/pdfWorker.js</code> must sit next to <code>dist/riffle.min.js</code> at runtime. The CDN build resolves it from the same URL path as the library bundle.</p>
-<h2>Documentation</h2>
-<ul>
-<li><a href="https://rvanb.github.io/riffle.js/docs/">API reference</a></li>
-<li><a href="https://rvanb.github.io/riffle.js/">Live demo</a></li>
-</ul></article>
+</code></pre></article>
     </section>
 
 
