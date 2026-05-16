@@ -160,6 +160,7 @@
       const viewer = Riffle({ paperPreset: "natural" });
       viewport.appendChild(viewer);
       stripContainer.appendChild(RifflePageStrip(viewer));
+      const defaultPdfUrl = "./artifacts/robinhood.pdf";
 
       const pageInput = document.getElementById("page-input");
       const spreadReadout = document.getElementById("spread-readout");
@@ -218,6 +219,20 @@
               console.error(error);
           }
       });
+
+      const openDefaultPdf = async () => {
+          try {
+              const response = await fetch(defaultPdfUrl);
+              if (!response.ok) throw new Error(`Failed to load default PDF: ${response.status}`);
+              const blob = await response.blob();
+              const file = new File([blob], "robinhood.pdf", { type: "application/pdf" });
+              await viewer.openPdf(file);
+              refreshPageReadout();
+          } catch (error) {
+              console.error(error);
+          }
+      };
+      openDefaultPdf();
 
       document.getElementById("zoom-in").addEventListener("click", () => viewer.adjustZoom(1));
       document.getElementById("zoom-out").addEventListener("click", () => viewer.adjustZoom(-1));

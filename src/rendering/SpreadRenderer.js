@@ -234,7 +234,13 @@ export class SpreadRenderer {
 
       for (const [sideName, sideState] of Object.entries(sideStates)) {
         const oppositeSide = sideName === "left" ? "right" : "left";
-        if (!sideState.page || sideState.isEndPage || !sideStates[oppositeSide]?.page) continue;
+        if (
+          !sideState.page
+          || !sideState.drawnRect
+          || sideState.isEndPage
+          || !sideStates[oppositeSide]?.page
+          || !sideStates[oppositeSide]?.drawnRect
+        ) continue;
         drawDirectionalLightFalloff(
           ctx,
           sideState.pageRect,
@@ -247,7 +253,9 @@ export class SpreadRenderer {
       const paperTextureStrength = Math.max(0, Math.min(1, display.paperTextureStrength ?? 0.2));
       if (paperTextureStrength > 0.0001) {
         for (const sideState of Object.values(sideStates)) {
-          if (sideState.page) drawPaperTextureOverlay(ctx, sideState.pageRect, this.paperTextureCanvas, { strength: paperTextureStrength });
+          if (sideState.page && sideState.drawnRect) {
+            drawPaperTextureOverlay(ctx, sideState.pageRect, this.paperTextureCanvas, { strength: paperTextureStrength });
+          }
         }
       }
     }

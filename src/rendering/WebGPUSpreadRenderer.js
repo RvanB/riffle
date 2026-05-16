@@ -951,12 +951,15 @@ export class WebGPUSpreadRenderer {
 
               @fragment
               fn main(input: FragmentIn) -> @location(0) vec4<f32> {
+                let paper = uniforms.paperColor.rgb;
+                if (uniforms.effectD.y > 0.5) {
+                  return vec4<f32>(paper, 1.0);
+                }
                 let texel = textureSample(tex, texSampler, input.uv);
                 let stUV = vec2<f32>(1.0 - input.pageUv.x, input.pageUv.y);
                 let showThroughTexel = textureSample(showThroughTex, texSampler, stUV);
                 let backFaceTexel = textureSample(backFaceTex, texSampler, stUV);
                 let translucencyTexel = textureSample(translucencyTex, texSampler, input.uv);
-                let paper = uniforms.paperColor.rgb;
                 let normal = normalize(input.worldNormal);
                 let frontVisible = normal.z >= 0.0;
                 let visibleTexel = select(backFaceTexel, texel, frontVisible);
@@ -1463,7 +1466,10 @@ export class WebGPUSpreadRenderer {
     if (!sideState?.page) return;
 
     const effectEntry = scene.effects[side];
-    const pageSurface = this.#getPageSurfaceCanvas(scene, sideState, side);
+    const hasLoadedContent = !!sideState.surfaceSource;
+    const pageSurface = hasLoadedContent
+      ? this.#getPageSurfaceCanvas(scene, sideState, side)
+      : this.emptyShowThroughCanvas;
     if (!pageSurface) return;
 
     const geometry = this.#getPageGeometry(sideState.pageRect.w, sideState.pageRect.h);
@@ -1492,10 +1498,14 @@ export class WebGPUSpreadRenderer {
     uniformData.set([light.x, light.y, light.z, 1], 16);
     uniformData.set([this.canvas.width, this.canvas.height, -this.canvas.width, this.canvas.width], 20);
     const oppositeSide = side === "left" ? "right" : "left";
-    const hasFacingPage = !!scene.sideStates[oppositeSide]?.page && !sideState.isEndPage;
+    const hasFacingPage = hasLoadedContent
+      && !!scene.sideStates[oppositeSide]?.surfaceSource
+      && !sideState.isEndPage;
     uniformData.set([hasFacingPage ? 1 : 0, hingeOnRight ? 1 : 0, normalSign, flipX ? 1 : 0], 24);
     const paperThickness = Math.max(0, Math.min(1, scene.display.paperThickness ?? 0.5));
-    const paperTextureStrength = Math.max(0, Math.min(1, scene.display.paperTextureStrength ?? 0.2));
+    const paperTextureStrength = hasLoadedContent
+      ? Math.max(0, Math.min(1, scene.display.paperTextureStrength ?? 0.2))
+      : 0;
     uniformData.set([occluders.length, ignoreOccluderId, paperThickness, paperTextureStrength], 28);
     uniformData.set(paperColor, 32);
     uniformData.set([neutralize[0], neutralize[1], neutralize[2], neutralizeEnabled], 36);
@@ -1511,7 +1521,7 @@ export class WebGPUSpreadRenderer {
       (gpuEffects.levels?.white ?? 255) / 255,
       gpuEffects.bwEnabled ? 1 : 0,
     ], 44);
-    uniformData.set([getBlendModeIndex(scene.display.contentBlendMode), 0, 0, 0], 48);
+    uniformData.set([getBlendModeIndex(scene.display.contentBlendMode), hasLoadedContent ? 0 : 1, 0, 0], 48);
     uniformData.set(lightShadowColor, 52);
     uniformData.set(lightHighlightColor, 56);
     uniformData.set(shadowTintColor, 60);
