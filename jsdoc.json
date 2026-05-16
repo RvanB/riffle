@@ -1,0 +1,42 @@
+{
+  "source": {
+    "include": ["src", "README.md"],
+    "includePattern": "\\.js$",
+    "exclude": ["src/loading/pdfWorker.js"]
+  },
+  "opts": {
+    "destination": "docs",
+    "encoding": "utf8",
+    "readme": "README.md",
+    "recurse": true,
+    "template": "node_modules/docdash"
+  },
+  "plugins": ["plugins/markdown"],
+  "templates": {
+    "cleverLinks": true,
+    "monospaceLinks": true,
+    "default": {
+      "includeDate": false
+    }
+  },
+  "docdash": {
+    "static": true,
+    "sort": true,
+    "search": true,
+    "collapse": true,
+    "typedefs": true,
+    "removeQuotes": "trim",
+    "menu": {
+      "GitHub": {
+        "href": "https://github.com/RvanB/riffle.js",
+        "target": "_blank"
+      },
+      "Demo": {
+        "href": "../"
+      }
+    },
+    "meta": {
+      "title": "Riffle docs"
+    }
+  }
+}

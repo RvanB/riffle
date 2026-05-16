@@ -37,16 +37,15 @@ Open `http://localhost:8000/` for the demo. While iterating locally, the demo im
 
 ## Documentation
 
-Documentation is published at [rifflejs.readthedocs.io](https://rifflejs.readthedocs.io/). The API reference is auto-generated from JSDoc comments in `src/` by `npm run docs:api`, then rendered into a static site by [MkDocs](https://www.mkdocs.org/) (with the [Material](https://squidfunk.github.io/mkdocs-material/) theme).
+Documentation lives alongside the demo on GitHub Pages: [rvanb.github.io/riffle.js/docs](https://rvanb.github.io/riffle.js/docs/). The API reference is generated from JSDoc comments in `src/` by [JSDoc](https://jsdoc.app/) with the [docdash](https://github.com/clenemt/docdash) template, then committed to `docs/` so GitHub Pages can serve it directly.
 
-To build the docs locally:
+To rebuild locally:
 
 ```bash
-npm run docs:api
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r docs/requirements.txt
-mkdocs serve
+npm run docs
 ```
+
+Releases are cut with `./scripts/release.sh vX.Y.Z`, which rebuilds `dist/` and `docs/`, commits, tags, and pushes.
 
 ## Build Output
 

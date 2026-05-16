@@ -17,12 +17,12 @@
   ],
   "scripts": {
     "build": "esbuild src/index.js --bundle --format=esm --minify --sourcemap --outfile=dist/riffle.min.js && esbuild src/loading/pdfWorker.js --bundle --format=esm --minify --sourcemap --outfile=dist/pdfWorker.js",
-    "docs:api": "node scripts/build-api-docs.mjs",
-    "docs": "npm run docs:api"
+    "docs": "rm -rf docs && jsdoc -c jsdoc.json && ./scripts/prune-docs.sh",
+    "release": "./scripts/release.sh"
   },
   "devDependencies": {
+    "docdash": "^2.0.2",
     "esbuild": "^0.23.0",
-    "glob": "^13.0.6",
-    "jsdoc-to-markdown": "^9.1.3"
+    "jsdoc": "^4.0.5"
   }
 }
