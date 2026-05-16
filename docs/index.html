@@ -69,21 +69,51 @@
 <p>Riffle is a browser book viewer for page bitmaps and PDFs. It renders a two-page spread with animated page turns, paper lighting, translucency, show-through, WebGPU when available, and a 2D canvas fallback.</p>
 <p>The library returns plain DOM elements and does not impose wrappers or app layout. You decide where the canvas lives, how it scrolls, and how the optional page strip is styled.</p>
 <h2>Quick Start</h2>
-<pre class="prettyprint source lang-html"><code>&lt;div id=&quot;viewport&quot;>&lt;/div>
-&lt;div id=&quot;strip&quot;>&lt;/div>
+<p>A complete, paste-and-run HTML file:</p>
+<pre class="prettyprint source lang-html"><code>&lt;!DOCTYPE html>
+&lt;html lang=&quot;en&quot;>
+  &lt;head>
+    &lt;meta charset=&quot;utf-8&quot; />
+    &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot; />
+    &lt;style>
+      /* The viewer sizes itself to its scrollable container. */
+      #viewport {
+        width: 800px;
+        height: 600px;
+        overflow: auto;
+      }
+      /* RifflePageStrip is an empty div that fills with thumbnail children;
+         give it a flex row so the thumbnails lay out horizontally. */
+      #strip > div {
+        display: flex;
+        flex-direction: row;
+      }
+    &lt;/style>
+  &lt;/head>
+  &lt;body>
+    &lt;input id=&quot;file-picker&quot; type=&quot;file&quot; accept=&quot;application/pdf&quot; />
+    &lt;div id=&quot;viewport&quot;>&lt;/div>
+    &lt;div id=&quot;strip&quot;>&lt;/div>
 
-&lt;script type=&quot;module&quot;>
-  import { Riffle, RifflePageStrip } from &quot;https://cdn.jsdelivr.net/gh/RvanB/riffle.js@v0.1.8/dist/riffle.min.js&quot;;
+    &lt;script type=&quot;module&quot;>
+      import { Riffle, RifflePageStrip } from &quot;https://cdn.jsdelivr.net/gh/RvanB/riffle.js@v0.1.8/dist/riffle.min.js&quot;;
 
-  const viewer = Riffle({ paperPreset: &quot;natural&quot; });
-  document.getElementById(&quot;viewport&quot;).appendChild(viewer);
-  document.getElementById(&quot;strip&quot;).appendChild(RifflePageStrip(viewer));
+      const viewer = Riffle();
+      document.getElementById(&quot;viewport&quot;).appendChild(viewer);
+      document.getElementById(&quot;strip&quot;).appendChild(RifflePageStrip(viewer));
 
-  await viewer.openPdf(file);
-  viewer.navigateTo(2);
-  viewer.adjustZoom(1);
-&lt;/script>
+      document.getElementById(&quot;file-picker&quot;).addEventListener(&quot;change&quot;, async (e) => {
+        await viewer.openPdf(e.target.files[0]);
+      });
+    &lt;/script>
+  &lt;/body>
+&lt;/html>
 </code></pre>
+<p>Two things the library leaves to you:</p>
+<ul>
+<li><strong>Size the viewport.</strong> The canvas reads its parent (or nearest scrollable ancestor) to compute its dimensions; give that element an explicit width/height. Pass <code>Riffle({ viewport: el })</code> to override the lookup.</li>
+<li><strong>Lay out the page strip.</strong> <code>RifflePageStrip</code> returns an empty <code>&lt;div&gt;</code> that fills with one child per page — apply your own flex/grid styling to it.</li>
+</ul>
 <p><code>dist/pdfWorker.js</code> must sit next to <code>dist/riffle.min.js</code> at runtime. The CDN build resolves it from the same URL path as the library bundle.</p>
 <h2>Local Development</h2>
 <pre class="prettyprint source lang-bash"><code>npm install
