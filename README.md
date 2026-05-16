@@ -4,6 +4,8 @@ Riffle is a browser book viewer for page bitmaps and PDFs. It renders a two-page
 
 The library returns plain DOM elements and does not impose wrappers or app layout. You decide where the canvas lives, how it scrolls, and how the optional page strip is styled.
 
+![Riffle viewer screenshot](https://raw.githubusercontent.com/RvanB/riffle.js/main/artifacts/riffle.png)
+
 ## Quick Start
 
 A complete, paste-and-run HTML file:
