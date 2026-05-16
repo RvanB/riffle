@@ -2,6 +2,7 @@ const PDFJS_URL = "https://unpkg.com/pdfjs-dist@5.6.205/build/pdf.mjs";
 const PDF_WORKER_URL = "https://unpkg.com/pdfjs-dist@5.6.205/build/pdf.worker.mjs";
 const PDF_CMAP_URL = "https://unpkg.com/pdfjs-dist@5.6.205/cmaps/";
 const PDF_STANDARD_FONT_DATA_URL = "https://unpkg.com/pdfjs-dist@5.6.205/standard_fonts/";
+const PDF_WASM_URL = "https://unpkg.com/pdfjs-dist@5.6.205/wasm/";
 
 // Hard cap on OffscreenCanvas dimensions used for pdf.js rendering. Higher
 // values risk hitting GPU-dependent canvas size limits in Firefox/Safari
@@ -430,6 +431,7 @@ const handlers = {
       cMapUrl: PDF_CMAP_URL,
       cMapPacked: true,
       standardFontDataUrl: PDF_STANDARD_FONT_DATA_URL,
+      wasmUrl: PDF_WASM_URL,
       disableFontFace: true,
     }).promise;
     const docId = nextDocId++;
