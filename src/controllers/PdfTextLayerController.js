@@ -34,6 +34,9 @@ function injectTextLayerStyle(documentRef) {
   -webkit-user-select: none;
   transform-origin: 0 0;
 }
+.riffle-pdf-text-layer.text-visible span {
+  color: CanvasText;
+}
 .riffle-pdf-text-layer span.custom-selected {
   background: linear-gradient(
     to right,
@@ -44,9 +47,6 @@ function injectTextLayerStyle(documentRef) {
     transparent var(--riffle-selection-right, 100%),
     transparent 100%
   );
-}
-.riffle-pdf-text-layer.text-visible span {
-  color: CanvasText;
 }
 .riffle-pdf-link {
   position: absolute;
@@ -137,6 +137,7 @@ export class PdfTextLayerController {
     this.resizeObserver = null;
     this.mutationObserver = null;
     this.dragStart = null;
+    this.updateDeferred = false;
     this.selectionOptions = { add: false, subtract: false };
     this.selectedSpans = [];
     this.selectedRanges = [];
@@ -187,6 +188,10 @@ export class PdfTextLayerController {
   }
 
   update() {
+    if (this.dragStart) {
+      this.updateDeferred = true;
+      return;
+    }
     const { spreadCanvas } = this.viewer;
     if (!spreadCanvas?.ownerDocument || !spreadCanvas.parentElement) return;
     this.#ensureLayer();
@@ -236,13 +241,17 @@ export class PdfTextLayerController {
       fragments.push(this.#buildLinkFragment(sideState, linkAnnotations));
     }
     if (token !== this.renderToken || !this.layer) return;
-    this.#clearSelection();
+    const selectionSnapshot = this.#snapshotSelection();
     this.layer.replaceChildren(...fragments);
     this.layer.hidden = fragments.length === 0;
     this.#positionLayer();
     this.#fitTextRuns();
+    this.#restoreSelectionSnapshot(selectionSnapshot);
     this.layer.ownerDocument.fonts?.ready?.then(() => {
-      if (token === this.renderToken) this.#fitTextRuns();
+      if (token === this.renderToken) {
+        this.#fitTextRuns();
+        this.#restoreSelectionSnapshot(selectionSnapshot);
+      }
     });
   }
 
@@ -368,6 +377,7 @@ export class PdfTextLayerController {
     if (event.button === 0 && event.target.closest?.(".riffle-pdf-link")) return;
     event.preventDefault();
     this.layer.ownerDocument.getSelection?.()?.removeAllRanges();
+    this.renderToken += 1;
     const caret = this.#getCaretAtPoint(event.clientX, event.clientY);
     this.dragStart = {
       x: event.clientX,
@@ -408,6 +418,10 @@ export class PdfTextLayerController {
     event.preventDefault();
     this.layer?.releasePointerCapture?.(event.pointerId);
     this.dragStart = null;
+    if (this.updateDeferred) {
+      this.updateDeferred = false;
+      if (!this.selectedRanges.length) this.update();
+    }
   }
 
   #onContextMenu(event) {
@@ -498,6 +512,10 @@ export class PdfTextLayerController {
       : options.add
         ? this.#mergeRanges([...(options.baseRanges || []), ...ranges])
         : this.#mergeRanges(ranges);
+    this.#applySelectedRanges(selectedRanges);
+  }
+
+  #applySelectedRanges(selectedRanges) {
     for (const span of this.#getOrderedSpans()) {
       const selection = selectedRanges.find(range => range.span === span) || null;
       span.classList.toggle("custom-selected", !!selection);
@@ -666,6 +684,43 @@ export class PdfTextLayerController {
     this.selectedSpans = [];
     this.selectedRanges = [];
     this.selectedText = "";
+  }
+
+  #snapshotSelection() {
+    return this.selectedRanges.map(range => ({
+      order: Number(range.span.dataset.order) || 0,
+      startIndex: range.startIndex ?? 0,
+      endIndex: range.endIndex ?? Array.from(range.span.textContent || "").length,
+    }));
+  }
+
+  #restoreSelectionSnapshot(snapshot) {
+    if (!snapshot.length) {
+      this.#clearSelection();
+      return;
+    }
+
+    const spansByOrder = new Map(this.#getOrderedSpans().map(span => [Number(span.dataset.order) || 0, span]));
+    const restoredRanges = [];
+    for (const item of snapshot) {
+      const span = spansByOrder.get(item.order);
+      if (!span) continue;
+      const chars = Array.from(span.textContent || "");
+      if (!chars.length) continue;
+      const startIndex = clamp(item.startIndex, 0, chars.length);
+      const endIndex = clamp(item.endIndex, 0, chars.length);
+      if (endIndex <= startIndex) continue;
+      restoredRanges.push({
+        span,
+        text: chars.slice(startIndex, endIndex).join(""),
+        rect: span.getBoundingClientRect(),
+        startIndex,
+        endIndex,
+        leftPercent: (startIndex / chars.length) * 100,
+        rightPercent: (endIndex / chars.length) * 100,
+      });
+    }
+    this.#applySelectedRanges(restoredRanges);
   }
 
   #buildSelectedText(ranges) {
