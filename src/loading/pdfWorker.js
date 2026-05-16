@@ -241,6 +241,8 @@ const docs = new Map();
 const activeOps = new Map();
 const cleanupPending = new Set();
 const rasterInfoCache = new Map();
+const textContentCache = new Map();
+const linkAnnotationCache = new Map();
 let nextDocId = 1;
 
 function bumpOps(docId) {
@@ -258,6 +260,9 @@ function maybeCleanup(docId) {
   if (!cleanupPending.has(docId)) return;
   if ((activeOps.get(docId) || 0) > 0) return;
   cleanupPending.delete(docId);
+  rasterInfoCache.delete(docId);
+  textContentCache.delete(docId);
+  linkAnnotationCache.delete(docId);
   docs.get(docId)?.cleanup?.();
 }
 
@@ -454,6 +459,95 @@ const handlers = {
     }
     if (!docCache.has(pageNum)) {
       docCache.set(pageNum, computeRasterInfo(docId, pageNum));
+    }
+    return docCache.get(pageNum);
+  },
+
+  async getTextContent({ docId, pageNum }) {
+    let docCache = textContentCache.get(docId);
+    if (!docCache) {
+      docCache = new Map();
+      textContentCache.set(docId, docCache);
+    }
+    if (!docCache.has(pageNum)) {
+      docCache.set(pageNum, withPdfPage(docId, pageNum, async page => {
+        const viewport = page.getViewport({ scale: 1 });
+        const textContent = await page.getTextContent({
+          includeMarkedContent: false,
+          disableNormalization: false,
+          disableCombineTextItems: true,
+        });
+        return {
+          width: viewport.width,
+          height: viewport.height,
+          transform: viewport.transform,
+          styles: Object.fromEntries(
+            Object.entries(textContent.styles || {}).map(([name, style]) => [
+              name,
+              {
+                fontFamily: style.fontFamily || "",
+                ascent: Number(style.ascent) || 0,
+                descent: Number(style.descent) || 0,
+                vertical: !!style.vertical,
+              },
+            ])
+          ),
+          items: (textContent.items || [])
+            .filter(item => item?.str)
+            .map(item => ({
+              str: item.str,
+              dir: item.dir || "ltr",
+              fontName: item.fontName || "",
+              width: Number(item.width) || 0,
+              height: Number(item.height) || 0,
+              transform: item.transform,
+            })),
+        };
+      }));
+    }
+    return docCache.get(pageNum);
+  },
+
+  async getLinkAnnotations({ docId, pageNum }) {
+    let docCache = linkAnnotationCache.get(docId);
+    if (!docCache) {
+      docCache = new Map();
+      linkAnnotationCache.set(docId, docCache);
+    }
+    if (!docCache.has(pageNum)) {
+      docCache.set(pageNum, withPdfPage(docId, pageNum, async page => {
+        const doc = docs.get(docId);
+        const viewport = page.getViewport({ scale: 1 });
+        const annotations = await page.getAnnotations({ intent: "display" });
+        const links = [];
+        for (const annotation of annotations || []) {
+          if (annotation?.subtype !== "Link" || !annotation.rect) continue;
+          let destPageNum = 0;
+          if (annotation.dest && doc?.getDestination && doc?.getPageIndex) {
+            try {
+              const dest = typeof annotation.dest === "string"
+                ? await doc.getDestination(annotation.dest)
+                : annotation.dest;
+              const ref = Array.isArray(dest) ? dest[0] : null;
+              if (ref) destPageNum = (await doc.getPageIndex(ref)) + 1;
+            } catch (_error) {
+              destPageNum = 0;
+            }
+          }
+          links.push({
+            rect: annotation.rect,
+            url: annotation.url || annotation.unsafeUrl || "",
+            destPageNum,
+            title: annotation.title || "",
+          });
+        }
+        return {
+          width: viewport.width,
+          height: viewport.height,
+          transform: viewport.transform,
+          links,
+        };
+      }));
     }
     return docCache.get(pageNum);
   },

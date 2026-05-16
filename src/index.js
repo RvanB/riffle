@@ -21,6 +21,7 @@ export { SpreadRenderer } from "./rendering/SpreadRenderer.js";
 export { PageStrip } from "./controllers/PageStrip.js";
 export { NavigationController } from "./controllers/NavigationController.js";
 export { ZoomController } from "./controllers/ZoomController.js";
+export { PdfTextLayerController } from "./controllers/PdfTextLayerController.js";
 
 // Layout helpers (consumers building their own composition pipelines may
 // need these to align with the renderer's page-rect math).
@@ -53,6 +54,8 @@ export {
   renderPdfPage,
   getPdfPageAspectRatio,
   getPdfPageRasterSourceInfo,
+  getPdfPageTextContent,
+  getPdfPageLinkAnnotations,
   requestPdfDocumentCleanup,
 } from "./loading/pdfLoader.js";
 

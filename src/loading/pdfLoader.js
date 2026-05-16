@@ -120,6 +120,28 @@ export async function getPdfPageRasterSourceInfo(pdfDoc, pageNum) {
 }
 
 /**
+ * Returns selectable text content for a PDF page.
+ *
+ * @param {Object} pdfDoc Worker document handle.
+ * @param {number} pageNum One-based PDF page number.
+ * @returns {Promise<Object>} Page viewport info and text items.
+ */
+export async function getPdfPageTextContent(pdfDoc, pageNum) {
+  return call("getTextContent", { docId: pdfDoc.docId, pageNum });
+}
+
+/**
+ * Returns link annotations for a PDF page.
+ *
+ * @param {Object} pdfDoc Worker document handle.
+ * @param {number} pageNum One-based PDF page number.
+ * @returns {Promise<Object>} Page viewport info and link annotations.
+ */
+export async function getPdfPageLinkAnnotations(pdfDoc, pageNum) {
+  return call("getLinkAnnotations", { docId: pdfDoc.docId, pageNum });
+}
+
+/**
  * Renders a PDF page at a scale.
  *
  * @param {Object} pdfDoc Worker document handle.

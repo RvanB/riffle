@@ -1,6 +1,7 @@
 import { BookViewer } from "./BookViewer.js";
 import { WebGPUSpreadRenderer } from "./rendering/WebGPUSpreadRenderer.js";
 import { SpreadRenderer } from "./rendering/SpreadRenderer.js";
+import { PdfTextLayerController } from "./controllers/PdfTextLayerController.js";
 
 function pickRendererClass(option) {
   if (option === "2d") return SpreadRenderer;
@@ -24,6 +25,7 @@ function pickRendererClass(option) {
  * @property {boolean} [showPageBorder=true] Whether to render the page edge treatment.
  * @property {number} [maxHighResPages=8] High-resolution page bitmap LRU capacity.
  * @property {HTMLElement|null} [viewport=null] Element used for zoom measurement and scroll preservation.
+ * @property {boolean} [selectablePdfText=true] Whether to overlay selectable PDF text on settled spreads.
  */
 
 /**
@@ -48,6 +50,7 @@ export function Riffle({
   showPageBorder = true,
   maxHighResPages = 8,
   viewport = null,
+  selectablePdfText = true,
 } = {}) {
   const spreadCanvas = document.createElement("canvas");
   spreadCanvas.width = 0;
@@ -69,9 +72,11 @@ export function Riffle({
     showPageBorder,
     maxHighResPages,
   });
+  const pdfTextLayer = selectablePdfText ? new PdfTextLayerController(bookViewer) : null;
 
   const api = {
     bookViewer,
+    pdfTextLayer,
     get backendName() { return bookViewer.backendName; },
     get contentZoom() { return bookViewer.contentZoom; },
     get renderZoom() { return bookViewer.renderZoom; },
