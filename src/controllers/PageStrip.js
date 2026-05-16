@@ -140,15 +140,18 @@ export class PageStrip {
       ?? page.previewCanvas
       ?? null;
 
-    if (record.page === page && record.paintedSource === source && record.paintedKey === key) {
+    const thumbHeight = SHARED_PREVIEW_SIZE;
+    const thumbAspect = page.placedPreviewCanvas && layout
+      ? layout.pw / layout.ph
+      : page.aspectRatio || 1;
+    const thumbWidth = Math.max(1, Math.round(thumbHeight * thumbAspect));
+    const displayWidth = Math.max(1, Math.round(thumbWidth * (PAGE_STRIP_DISPLAY_HEIGHT / thumbHeight)));
+    const sizeKey = `${thumbWidth}x${thumbHeight}`;
+    const paintKey = `${key}|${sizeKey}`;
+
+    if (record.page === page && record.paintedSource === source && record.paintedKey === paintKey) {
       return;
     }
-
-    const thumbHeight = SHARED_PREVIEW_SIZE;
-    const thumbWidth = layout
-      ? Math.max(1, Math.round(thumbHeight * (layout.pw / layout.ph)))
-      : Math.max(1, Math.round(thumbHeight * (page.aspectRatio || 1)));
-    const displayWidth = Math.max(1, Math.round(thumbWidth * (PAGE_STRIP_DISPLAY_HEIGHT / thumbHeight)));
 
     const canvas = record.canvas;
     if (canvas.width !== thumbWidth) canvas.width = thumbWidth;
@@ -165,6 +168,6 @@ export class PageStrip {
 
     record.page = page;
     record.paintedSource = source;
-    record.paintedKey = key;
+    record.paintedKey = paintKey;
   }
 }
