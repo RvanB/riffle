@@ -11,7 +11,7 @@ The library returns plain DOM elements and does not impose wrappers or app layou
 <div id="strip"></div>
 
 <script type="module">
-  import { Riffle, RifflePageStrip } from "https://cdn.jsdelivr.net/gh/RvanB/riffle@v0.1.8/dist/riffle.min.js";
+  import { Riffle, RifflePageStrip } from "https://cdn.jsdelivr.net/gh/RvanB/riffle.js@v0.1.8/dist/riffle.min.js";
 
   const viewer = Riffle({ paperPreset: "natural" });
   document.getElementById("viewport").appendChild(viewer);
@@ -30,7 +30,6 @@ The library returns plain DOM elements and does not impose wrappers or app layou
 ```bash
 npm install
 npm run build
-npm run docs
 python3 -m http.server 8000
 ```
 
@@ -38,10 +37,16 @@ Open `http://localhost:8000/` for the demo. While iterating locally, the demo im
 
 ## Documentation
 
-- [Full documentation](docs/index.html)
-- [Standalone demo](index.html)
+Documentation is published at [rifflejs.readthedocs.io](https://rifflejs.readthedocs.io/). The API reference is auto-generated from JSDoc comments in `src/` by `npm run docs:api`, then rendered into a static site by [MkDocs](https://www.mkdocs.org/) (with the [Material](https://squidfunk.github.io/mkdocs-material/) theme).
 
-The documentation is generated from source JSDoc comments and covers options, methods, events, page sources, page and spread numbering, styling hooks, PDF loading, build output, and publishing.
+To build the docs locally:
+
+```bash
+npm run docs:api
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r docs/requirements.txt
+mkdocs serve
+```
 
 ## Build Output
 
@@ -56,5 +61,5 @@ dist/
 To publish through jsDelivr, commit the built `dist/` files, tag a release, and import from:
 
 ```js
-import { Riffle } from "https://cdn.jsdelivr.net/gh/RvanB/riffle@vX.Y.Z/dist/riffle.min.js";
+import { Riffle } from "https://cdn.jsdelivr.net/gh/RvanB/riffle.js@vX.Y.Z/dist/riffle.min.js";
 ```

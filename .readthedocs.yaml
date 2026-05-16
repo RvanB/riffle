@@ -5,13 +5,15 @@ build:
   tools:
     python: "3.12"
     nodejs: "20"
-
   jobs:
     post_install:
       - npm ci
+    pre_build:
+      - npm run docs:api
 
-    build:
-      html:
-        - npm run docs
-        - mkdir -p $READTHEDOCS_OUTPUT/html
-        - cp -r docs/* $READTHEDOCS_OUTPUT/html/
+mkdocs:
+  configuration: mkdocs.yml
+
+python:
+  install:
+    - requirements: docs/requirements.txt
