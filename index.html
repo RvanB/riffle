@@ -181,7 +181,7 @@
       const stage = document.getElementById("stage");
       const stripContainer = document.getElementById("strip-container");
       const loadingStatus = document.getElementById("loading-status");
-      const viewer = Riffle({ paperPreset: "natural" });
+      const viewer = Riffle({ paperPreset: "bright-white", renderScale: 1.5 });
       stage.appendChild(viewer);
       stripContainer.appendChild(RifflePageStrip(viewer));
 

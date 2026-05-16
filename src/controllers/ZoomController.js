@@ -19,10 +19,11 @@ function findScrollableAncestor(node) {
 // sizing math, sets CSS dimensions directly on the canvas to display it at
 // the current zoom level. No DOM wrappers required.
 export class ZoomController {
-  constructor(viewer) {
+  constructor(viewer, { renderScale = 1 } = {}) {
     this.viewer = viewer;
+    this.renderScale = Math.max(1, Number(renderScale) || 1);
     this.contentZoom = 1;
-    this.renderZoom = 1;
+    this.renderZoom = this.getSafeRenderZoom(this.contentZoom * this.renderScale);
   }
 
   #resolveViewport() {
@@ -118,7 +119,7 @@ export class ZoomController {
   }
 
   applySafeRenderZoom() {
-    const next = this.getSafeRenderZoom(this.contentZoom);
+    const next = this.getSafeRenderZoom(this.contentZoom * this.renderScale);
     if (Math.abs(this.renderZoom - next) < 0.0001) return false;
     this.renderZoom = next;
     return true;

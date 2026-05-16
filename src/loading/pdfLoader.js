@@ -2,6 +2,11 @@ let worker = null;
 let workerPromise = null;
 let nextRequestId = 1;
 const pending = new Map();
+const PDFJS_URL = "https://unpkg.com/pdfjs-dist@5.6.205/build/pdf.mjs";
+const PDF_WORKER_URL = "https://unpkg.com/pdfjs-dist@5.6.205/build/pdf.worker.mjs";
+const PDF_CMAP_URL = "https://unpkg.com/pdfjs-dist@5.6.205/cmaps/";
+const PDF_STANDARD_FONT_DATA_URL = "https://unpkg.com/pdfjs-dist@5.6.205/standard_fonts/";
+const PDF_WASM_URL = "https://unpkg.com/pdfjs-dist@5.6.205/wasm/";
 
 // Main-thread dispatch queue. We send at most one request to the worker at a
 // time so that newly-arriving high-priority requests (e.g. high-res renders
@@ -11,6 +16,130 @@ const highPriorityQueue = [];
 const lowPriorityQueue = [];
 let inFlight = 0;
 const MAX_IN_FLIGHT = 1;
+let mainPdfjsPromise = null;
+const mainTextContentCache = new WeakMap();
+const mainLinkAnnotationCache = new WeakMap();
+
+function getMainPdfjs() {
+  if (!mainPdfjsPromise) {
+    mainPdfjsPromise = import(PDFJS_URL).then(lib => {
+      lib.GlobalWorkerOptions.workerSrc = PDF_WORKER_URL;
+      return lib;
+    });
+  }
+  return mainPdfjsPromise;
+}
+
+function getPageCache(cache, pdfDoc) {
+  let docCache = cache.get(pdfDoc);
+  if (!docCache) {
+    docCache = new Map();
+    cache.set(pdfDoc, docCache);
+  }
+  return docCache;
+}
+
+async function getMainThreadPdfDocument(pdfDoc) {
+  if (!pdfDoc?._mainThreadPdfBytes) return null;
+  if (!pdfDoc._mainThreadPdfDocumentPromise) {
+    const data = pdfDoc._mainThreadPdfBytes.slice(0);
+    pdfDoc._mainThreadPdfDocumentPromise = getMainPdfjs().then(lib => lib.getDocument({
+      data,
+      cMapUrl: PDF_CMAP_URL,
+      cMapPacked: true,
+      standardFontDataUrl: PDF_STANDARD_FONT_DATA_URL,
+      wasmUrl: PDF_WASM_URL,
+      disableFontFace: true,
+    }).promise);
+  }
+  return pdfDoc._mainThreadPdfDocumentPromise;
+}
+
+async function getMainThreadTextContent(pdfDoc, pageNum) {
+  const cache = getPageCache(mainTextContentCache, pdfDoc);
+  if (!cache.has(pageNum)) {
+    cache.set(pageNum, (async () => {
+      const doc = await getMainThreadPdfDocument(pdfDoc);
+      if (!doc) throw new Error("PDF document is not available on the main thread");
+      const page = await doc.getPage(pageNum);
+      const viewport = page.getViewport({ scale: 1 });
+      const textContent = await page.getTextContent({
+        includeMarkedContent: false,
+        disableNormalization: false,
+        disableCombineTextItems: true,
+      });
+      return {
+        width: viewport.width,
+        height: viewport.height,
+        transform: viewport.transform,
+        styles: Object.fromEntries(
+          Object.entries(textContent.styles || {}).map(([name, style]) => [
+            name,
+            {
+              fontFamily: style.fontFamily || "",
+              ascent: Number(style.ascent) || 0,
+              descent: Number(style.descent) || 0,
+              vertical: !!style.vertical,
+            },
+          ])
+        ),
+        items: (textContent.items || [])
+          .filter(item => item?.str)
+          .map(item => ({
+            str: item.str,
+            dir: item.dir || "ltr",
+            fontName: item.fontName || "",
+            width: Number(item.width) || 0,
+            height: Number(item.height) || 0,
+            transform: item.transform,
+          })),
+      };
+    })());
+  }
+  return cache.get(pageNum);
+}
+
+async function getMainThreadLinkAnnotations(pdfDoc, pageNum) {
+  const cache = getPageCache(mainLinkAnnotationCache, pdfDoc);
+  if (!cache.has(pageNum)) {
+    cache.set(pageNum, (async () => {
+      const doc = await getMainThreadPdfDocument(pdfDoc);
+      if (!doc) throw new Error("PDF document is not available on the main thread");
+      const page = await doc.getPage(pageNum);
+      const viewport = page.getViewport({ scale: 1 });
+      const annotations = await page.getAnnotations({ intent: "display" });
+      const links = [];
+      for (const annotation of annotations || []) {
+        if (annotation?.subtype !== "Link" || !annotation.rect) continue;
+        let destPageNum = 0;
+        if (annotation.dest && doc?.getDestination && doc?.getPageIndex) {
+          try {
+            const dest = typeof annotation.dest === "string"
+              ? await doc.getDestination(annotation.dest)
+              : annotation.dest;
+            const ref = Array.isArray(dest) ? dest[0] : null;
+            if (ref) destPageNum = (await doc.getPageIndex(ref)) + 1;
+          } catch (_error) {
+            destPageNum = 0;
+          }
+        }
+        links.push({
+          rect: annotation.rect,
+          url: annotation.url || annotation.unsafeUrl || "",
+          destPageNum,
+          title: annotation.title || "",
+        });
+      }
+      return {
+        width: viewport.width,
+        height: viewport.height,
+        transform: viewport.transform,
+        links,
+      };
+    })());
+  }
+  return cache.get(pageNum);
+}
 
 async function createWorker() {
   const workerUrl = new URL("./pdfWorker.js", import.meta.url);
@@ -93,8 +222,16 @@ function call(type, payload, { transfer = [], priority = false } = {}) {
  * @returns {Promise<Object>} Worker document handle.
  */
 export async function loadPdfDocument(buffer) {
+  const mainThreadBytes = buffer instanceof ArrayBuffer ? buffer.slice(0) : null;
   const transferable = buffer instanceof ArrayBuffer ? [buffer] : [];
-  return call("loadDocument", { buffer }, { transfer: transferable });
+  const pdfDoc = await call("loadDocument", { buffer }, { transfer: transferable });
+  if (mainThreadBytes) {
+    Object.defineProperties(pdfDoc, {
+      _mainThreadPdfBytes: { value: mainThreadBytes },
+      _mainThreadPdfDocumentPromise: { value: null, writable: true },
+    });
+  }
+  return pdfDoc;
 }
 
 /**
@@ -126,8 +263,14 @@ export async function getPdfPageRasterSourceInfo(pdfDoc, pageNum) {
  * @param {number} pageNum One-based PDF page number.
  * @returns {Promise<Object>} Page viewport info and text items.
  */
-export async function getPdfPageTextContent(pdfDoc, pageNum) {
-  return call("getTextContent", { docId: pdfDoc.docId, pageNum });
+export async function getPdfPageTextContent(pdfDoc, pageNum, { priority = false } = {}) {
+  try {
+    return await getMainThreadTextContent(pdfDoc, pageNum);
+  } catch (_error) {
+    // Fall back to the worker path for externally-created document handles or
+    // browsers that reject the duplicate main-thread PDF.js document.
+  }
+  return call("getTextContent", { docId: pdfDoc.docId, pageNum }, { priority });
 }
 
 /**
@@ -137,8 +280,14 @@ export async function getPdfPageTextContent(pdfDoc, pageNum) {
  * @param {number} pageNum One-based PDF page number.
  * @returns {Promise<Object>} Page viewport info and link annotations.
  */
-export async function getPdfPageLinkAnnotations(pdfDoc, pageNum) {
-  return call("getLinkAnnotations", { docId: pdfDoc.docId, pageNum });
+export async function getPdfPageLinkAnnotations(pdfDoc, pageNum, { priority = false } = {}) {
+  try {
+    return await getMainThreadLinkAnnotations(pdfDoc, pageNum);
+  } catch (_error) {
+    // Fall back to the worker path for externally-created document handles or
+    // browsers that reject the duplicate main-thread PDF.js document.
+  }
+  return call("getLinkAnnotations", { docId: pdfDoc.docId, pageNum }, { priority });
 }
 
 /**

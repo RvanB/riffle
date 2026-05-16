@@ -285,8 +285,8 @@ export class PdfTextLayerController {
       const source = getPdfSource(sideState.page);
       if (!source?.pdfDoc || !source.pageNum) continue;
       const [textContent, linkAnnotations] = await Promise.all([
-        getPdfPageTextContent(source.pdfDoc, source.pageNum),
-        getPdfPageLinkAnnotations(source.pdfDoc, source.pageNum),
+        getPdfPageTextContent(source.pdfDoc, source.pageNum, { priority: true }),
+        getPdfPageLinkAnnotations(source.pdfDoc, source.pageNum, { priority: true }),
       ]);
       if (token !== this.renderToken) return;
       fragments.push(this.#buildPageFragment(sideState, textContent, order));
