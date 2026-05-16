@@ -34,6 +34,13 @@
       }
       .file-picker input { display: none; }
       .file-picker:hover { background: #333; }
+      .doc-link {
+          color: #aaa;
+          font-size: 13px;
+          text-decoration: none;
+          border-bottom: 1px solid #555;
+      }
+      .doc-link:hover { color: #ddd; border-bottom-color: #ddd; }
       #page-jump {
           display: flex;
           align-items: center;
@@ -126,6 +133,7 @@
         <span>Open PDF</span>
         <input type="file" id="pdf-input" accept="application/pdf" />
       </label>
+      <a class="doc-link" href="./docs/index.html">Docs</a>
       <div id="page-jump">
         <input id="page-input" type="number" min="1" value="" />
         <span id="spread-readout">pages —</span>

@@ -9,20 +9,33 @@ function pickRendererClass(option) {
   return "gpu" in navigator ? WebGPUSpreadRenderer : SpreadRenderer;
 }
 
-// Factory: create a Riffle viewer canvas.
-//
-//   const viewer = Riffle({ paperPreset: "natural" });
-//   document.body.appendChild(viewer);     // it's just a <canvas>
-//   await viewer.openPdf(file);
-//
-// The returned value is the <canvas> element itself with viewer methods
-// stamped on it (`.openPdf`, `.navigateTo`, `.adjustZoom`, `.on`, etc.).
-// Riffle imposes no DOM wrappers or styling — the consumer decides how to
-// position, scroll, and style the canvas.
-//
-// Zoom math reads the canvas's scrollable ancestor for viewport size and
-// uses it for scroll positioning. Pass an explicit `viewport` if you want
-// a different element (e.g. a non-ancestor) to drive zoom.
+/**
+ * Options for {@link Riffle}.
+ *
+ * @typedef {Object} RiffleOptions
+ * @property {"auto"|"webgpu"|"2d"|Function} [renderer="auto"] Renderer selection. `auto` uses WebGPU when available.
+ * @property {PageSource|null} [source=null] Initial page source.
+ * @property {Partial<Layout>|null} [layout=null] Initial layout overrides.
+ * @property {Partial<Display>|null} [display=null] Initial display overrides.
+ * @property {"natural"|"ivory"|"bright-white"} [paperPreset] Named paper preset.
+ * @property {string} [contentBlendMode="multiply"] Blend mode for page content.
+ * @property {number} [paperThickness] Paper edge and turn-lighting strength from 0 to 1.
+ * @property {number} [paperTextureStrength] Paper texture/normal strength from 0 to 1.
+ * @property {boolean} [showPageBorder=true] Whether to render the page edge treatment.
+ * @property {number} [maxHighResPages=8] High-resolution page bitmap LRU capacity.
+ * @property {HTMLElement|null} [viewport=null] Element used for zoom measurement and scroll preservation.
+ */
+
+/**
+ * Creates a Riffle viewer canvas.
+ *
+ * The returned value is the canvas itself with viewer methods and getters
+ * mixed in. Riffle imposes no DOM wrapper or layout styling; the consumer
+ * decides how the canvas is positioned, scrolled, and decorated.
+ *
+ * @param {RiffleOptions} [options={}] Viewer options.
+ * @returns {RiffleCanvas} Canvas element with the public viewer API.
+ */
 export function Riffle({
   renderer = "auto",
   source = null,

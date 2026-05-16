@@ -53,9 +53,13 @@ function warnIfMixedPageAspectRatios(aspectRatios) {
   );
 }
 
-// Backs a viewer with a PDF document. The PDF is rasterized lazily by the
-// viewer's LazyPageLoader; this source just describes the page set and
-// exposes the internal book the loader operates on.
+/**
+ * PDF-backed page source.
+ *
+ * The PDF is rasterized lazily by the viewer's lazy page loader. This source
+ * describes the page set, exposes an internal mutable book for the loader,
+ * and warns in the console when page aspect ratios differ.
+ */
 export class PdfPageSource extends PageSource {
   constructor() {
     super();
@@ -92,6 +96,12 @@ export class PdfPageSource extends PageSource {
     };
   }
 
+  /**
+   * Loads a PDF file or ArrayBuffer.
+   *
+   * @param {File|ArrayBuffer} file PDF file or binary buffer.
+   * @returns {Promise<void>}
+   */
   async openPdf(file) {
     const buffer = file instanceof ArrayBuffer ? file : await file.arrayBuffer();
     const pdfDoc = await loadPdfDocument(buffer);
@@ -108,8 +118,20 @@ export class PdfPageSource extends PageSource {
     this.notifyPageCountChanged();
   }
 
+  /**
+   * Returns the mutable book used by Riffle's lazy page loader.
+   *
+   * @returns {Object} Internal book.
+   */
   getInternalBook() { return this.book; }
+
+  /** @returns {number} Page count. */
   getPageCount() { return this.pages.length; }
+
+  /**
+   * @param {number} index Page index.
+   * @returns {PageMetadata|null} Page metadata.
+   */
   getPageMetadata(index) {
     const page = this.pages[index] ?? null;
     if (!page) return null;

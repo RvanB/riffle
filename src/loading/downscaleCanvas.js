@@ -15,10 +15,11 @@ function computeTargetSize(sourceWidth, sourceHeight, maxEdge) {
 }
 
 /**
- * Synchronous main-thread downscale, used by the interactive preview path
- * during pan/zoom interactions where we need a smaller copy immediately and
- * cannot await a worker round-trip. Accepts any CanvasImageSource (canvas,
- * OffscreenCanvas, ImageBitmap) and returns a regular HTMLCanvasElement.
+ * Synchronously downscales a canvas image source on the main thread.
+ *
+ * @param {CanvasImageSource} source Source image/canvas/bitmap.
+ * @param {number} maxEdge Maximum output edge in pixels.
+ * @returns {HTMLCanvasElement|CanvasImageSource|null} Downscaled canvas, original source, or null.
  */
 export function downscaleCanvasToMaxEdgeSync(source, maxEdge) {
   if (!source?.width || !source?.height) return null;

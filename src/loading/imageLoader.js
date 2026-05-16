@@ -14,10 +14,23 @@ function computeTargetSize(sourceWidth, sourceHeight, maxEdge) {
   };
 }
 
+/**
+ * Loads an image file as an ImageBitmap.
+ *
+ * @param {Blob} file Image file or blob.
+ * @returns {Promise<ImageBitmap>} Loaded image bitmap.
+ */
 export async function loadImageFile(file) {
   return createImageBitmap(file);
 }
 
+/**
+ * Loads a downscaled image preview.
+ *
+ * @param {Blob} file Image file or blob.
+ * @param {number} maxEdge Maximum preview edge in pixels.
+ * @returns {Promise<{canvas: ImageBitmap, width: number, height: number}>} Preview bitmap plus original dimensions.
+ */
 export async function loadImagePreview(file, maxEdge) {
   const bitmap = await createImageBitmap(file);
   const originalWidth = bitmap.width;

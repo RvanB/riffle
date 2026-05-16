@@ -15,7 +15,24 @@ import { PageSource } from "./PageSource.js";
 // passthrough page, the source isn't asked to materialize bitmaps. They
 // become required once Phase 3 makes the viewer pull bitmaps through the
 // source.
+/**
+ * Options for {@link ImagePageSource}.
+ *
+ * @typedef {Object} ImagePageSourceOptions
+ * @property {function():number} getPageCount Returns viewer page count.
+ * @property {function(number):PageMetadata|null} getPageMetadata Returns page metadata.
+ * @property {function(number):Promise<CanvasImageSource|null>|null} [getPagePreview=null] Optional preview loader.
+ * @property {function(number, number):Promise<CanvasImageSource|null>|null} [getPageHighRes=null] Optional high-resolution loader.
+ * @property {Object|null} [internalBook=null] Optional mutable book object used directly by Riffle's lazy loader.
+ */
+
+/**
+ * Callback-driven page source for host-owned page models.
+ */
 export class ImagePageSource extends PageSource {
+  /**
+   * @param {ImagePageSourceOptions} options Source callbacks.
+   */
   constructor({
     getPageCount,
     getPageMetadata,
@@ -36,13 +53,35 @@ export class ImagePageSource extends PageSource {
   // `internalBook` — the viewer's lazy loader will operate directly on it.
   // When omitted, the source is bitmap-callback-driven and the viewer won't
   // try to write into a host-owned book.
+  /**
+   * Returns the optional host-owned mutable book.
+   *
+   * @returns {Object|null} Internal book, if supplied.
+   */
   getInternalBook() { return this._internalBook; }
 
+  /** @returns {number} Page count. */
   getPageCount() { return this._getPageCount(); }
+
+  /**
+   * @param {number} index Page index.
+   * @returns {PageMetadata|null} Page metadata.
+   */
   getPageMetadata(index) { return this._getPageMetadata(index); }
+
+  /**
+   * @param {number} index Page index.
+   * @returns {Promise<CanvasImageSource|null>} Preview bitmap.
+   */
   async getPagePreview(index) {
     return this._getPagePreview ? this._getPagePreview(index) : null;
   }
+
+  /**
+   * @param {number} index Page index.
+   * @param {number} targetEdgePx Requested maximum edge in pixels.
+   * @returns {Promise<CanvasImageSource|null>} High-resolution bitmap.
+   */
   async getPageHighRes(index, targetEdgePx) {
     return this._getPageHighRes ? this._getPageHighRes(index, targetEdgePx) : null;
   }

@@ -1,18 +1,15 @@
 import { PageStrip } from "./controllers/PageStrip.js";
 
-// Factory: create a page-strip element bound to a Riffle viewer.
-//
-//   const viewer = Riffle();
-//   const strip = RifflePageStrip(viewer);
-//   document.body.append(viewer, strip);
-//
-// The returned element is an empty <div> populated with one thumb-per-page
-// as the source loads. Riffle imposes no styling — apply your own CSS to
-// position and decorate it.
-//
-// On thumb click, the strip calls `viewer.navigateTo(spread, pageIndex)`.
-// Default thumb shape uses class names `strip-thumb`, `strip-thumb canvas`,
-// and `strip-thumb.in-spread` for the active spread.
+/**
+ * Creates a thumbnail page strip bound to a Riffle viewer.
+ *
+ * The returned element is an empty `div` populated with one thumbnail per
+ * page as the source loads. The strip emits class names only; consumers own
+ * all layout and styling.
+ *
+ * @param {RiffleCanvas|BookViewer} viewer Viewer canvas returned by {@link Riffle}, or a {@link BookViewer}.
+ * @returns {HTMLDivElement} Page strip element. It also has `pageStrip` and `refresh` properties.
+ */
 export function RifflePageStrip(viewer) {
   const container = document.createElement("div");
   const bookViewer = viewer.bookViewer ?? viewer;

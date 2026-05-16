@@ -1,3 +1,9 @@
+/**
+ * Computes unscaled layout values.
+ *
+ * @param {Layout} layout Page layout.
+ * @returns {Object} Unscaled derived layout values.
+ */
 export function computeLayoutValues(layout) {
   const pw = Number(layout.pw) || 0;
   const ph = Number(layout.ph) || 0;
@@ -25,6 +31,13 @@ export function computeLayoutValues(layout) {
   };
 }
 
+/**
+ * Computes scaled margin and page dimensions.
+ *
+ * @param {Layout} layout Page layout.
+ * @param {number} scale Render scale.
+ * @returns {Object} Scaled margin values.
+ */
 export function computeMargins(layout, scale) {
   const values = computeLayoutValues(layout);
   return {
@@ -41,6 +54,16 @@ export function computeMargins(layout, scale) {
   };
 }
 
+/**
+ * Computes page, text block, overlay, and content placement rectangles for
+ * one side of a spread.
+ *
+ * @param {Object} margins Scaled margins from {@link computeMargins}.
+ * @param {"left"|"right"} sideName Spread side.
+ * @param {ViewerPage|Object|null} page Page metadata or viewer page.
+ * @param {number} [pageRectX=0] X coordinate for the page rectangle.
+ * @returns {Object} Page geometry for rendering and overlays.
+ */
 export function getPageGeometry(margins, sideName, page, pageRectX = 0) {
   const isLeft = sideName === "left";
   const fitMode = page?.fitAxis === "width" || page?.fitAxis === "height" || page?.fitAxis === "inside"
@@ -95,10 +118,26 @@ export function getPageGeometry(margins, sideName, page, pageRectX = 0) {
   };
 }
 
+/**
+ * Computes a scale that fits a two-page spread inside a container.
+ *
+ * @param {Layout} layout Page layout.
+ * @param {number} containerW Container width in pixels.
+ * @param {number} containerH Container height in pixels.
+ * @returns {number} Render scale.
+ */
 export function computeScale(layout, containerW, containerH) {
   return Math.min((containerW - 64) / (2 * layout.pw), (containerH - 64) / layout.ph);
 }
 
+/**
+ * Computes a scale that fits one page inside a container.
+ *
+ * @param {Layout} layout Page layout.
+ * @param {number} containerW Container width in pixels.
+ * @param {number} containerH Container height in pixels.
+ * @returns {number} Render scale.
+ */
 export function computeContentScale(layout, containerW, containerH) {
   return Math.min((containerW - 64) / layout.pw, (containerH - 64) / layout.ph);
 }

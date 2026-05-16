@@ -11,15 +11,34 @@ const DEFAULT_LAYOUT = {
   mInner: 0, mTop: 0, mBottom: 0,
 };
 
-// BookViewer is the renderer-facing entrypoint. Hosts (the Riffle factory,
-// or a margin-style integrator) supply the canvas elements and a PageSource;
-// BookViewer drives navigation, page-turn animation, show-through, the LRU
-// bitmap cache, and broadcasts events the host can hook into.
-//
-// All state lives here — there's no longer a back-reference to a host app.
-// Controllers (NavigationController, ZoomController) read this object's
-// fields directly.
+/**
+ * Options for {@link BookViewer}.
+ *
+ * @typedef {Object} BookViewerOptions
+ * @property {HTMLCanvasElement} spreadCanvas Canvas the renderer draws into.
+ * @property {HTMLElement|null} [viewport=null] Element used for zoom measurement and scroll preservation.
+ * @property {Function} rendererClass Renderer constructor, usually {@link WebGPUSpreadRenderer} or {@link SpreadRenderer}.
+ * @property {PageSource|null} [source=null] Initial page source.
+ * @property {Partial<Layout>|null} [layout=null] Initial layout overrides.
+ * @property {Partial<Display>|null} [display=null] Initial display overrides.
+ * @property {string} [paperPreset="natural"] Paper preset id.
+ * @property {string} [contentBlendMode="multiply"] Blend mode for page content.
+ * @property {number} [paperThickness=0.5] Paper edge and turn-lighting strength from 0 to 1.
+ * @property {number} [paperTextureStrength=0.18] Paper texture/normal strength from 0 to 1.
+ * @property {boolean} [showPageBorder=true] Whether to render the page edge treatment.
+ * @property {number} [maxHighResPages=8] High-resolution page bitmap LRU capacity.
+ */
+
+/**
+ * Renderer-facing viewer class.
+ *
+ * Hosts supply a canvas and a {@link PageSource}; `BookViewer` drives
+ * navigation, page-turn animation, zoom, lazy bitmap loading, and events.
+ */
 export class BookViewer {
+  /**
+   * @param {BookViewerOptions} options Viewer options.
+   */
   constructor({
     spreadCanvas,
     viewport = null,
@@ -84,6 +103,13 @@ export class BookViewer {
   get numSpreads() { return this.book.numSpreads(); }
   get viewerBook() { return this.book; }   // alias for legacy host code
 
+  /**
+   * Replaces the page source, resets navigation to spread 0, warms previews,
+   * redraws, and emits `sourcechange`.
+   *
+   * @param {PageSource} source New page source.
+   * @returns {void}
+   */
   setSource(source) {
     this.source = source;
     this.book = new ViewerBook(source);
@@ -103,27 +129,58 @@ export class BookViewer {
     this.emit("sourcechange", { source });
   }
 
+  /**
+   * Merges layout fields and redraws.
+   *
+   * @param {Partial<Layout>} layout Layout fields to update.
+   * @returns {void}
+   */
   setLayout(layout) {
     this.layout = { ...this.layout, ...layout };
     this.redraw();
   }
 
+  /**
+   * Merges display fields and redraws.
+   *
+   * @param {Partial<Display>} display Display fields to update.
+   * @returns {void}
+   */
   setDisplay(display) {
     this.display = { ...this.display, ...display };
     this.redraw();
   }
 
+  /**
+   * Toggles page edge rendering.
+   *
+   * @param {boolean} show Whether the page edge treatment should render.
+   * @returns {void}
+   */
   setShowPageBorder(show) {
     this.showPageBorder = !!show;
     this.zoomController.syncCanvasStage();
     this.redraw();
   }
 
+  /**
+   * Sets the element used for zoom measurement and scroll preservation.
+   *
+   * @param {HTMLElement|null} viewport Viewport element.
+   * @returns {void}
+   */
   setViewport(viewport) {
     this.viewport = viewport;
     this.redraw();
   }
 
+  /**
+   * Navigates to a spread. Long jumps are queued as multiple page turns.
+   *
+   * @param {number} spreadIndex Target spread index.
+   * @param {number|null} [preferredPageIndex=null] Page index to prefer when updating selection/readouts.
+   * @returns {void}
+   */
   navigateTo(spreadIndex, preferredPageIndex = null) {
     const target = Math.max(0, Math.min(spreadIndex, this.numSpreads - 1));
     const distance = Math.abs(target - this.navigationController.getEffectiveSpread());
@@ -134,9 +191,28 @@ export class BookViewer {
     }
   }
 
+  /**
+   * Adjusts content zoom. Positive values zoom in; negative values zoom out.
+   *
+   * @param {number} direction Zoom direction.
+   * @returns {void}
+   */
   adjustZoom(direction) { this.zoomController.adjustContentZoom(direction); }
+
+  /**
+   * Resets content zoom to 1.
+   *
+   * @returns {void}
+   */
   resetZoom() { this.zoomController.resetContentZoom(); }
 
+  /**
+   * Subscribes to a viewer event.
+   *
+   * @param {string} event Event name.
+   * @param {Function} fn Listener callback.
+   * @returns {Function} Unsubscribe function.
+   */
   on(event, fn) {
     let arr = this.listeners.get(event);
     if (!arr) { arr = []; this.listeners.set(event, arr); }
@@ -144,6 +220,13 @@ export class BookViewer {
     return () => this.off(event, fn);
   }
 
+  /**
+   * Removes a viewer event listener.
+   *
+   * @param {string} event Event name.
+   * @param {Function} fn Listener callback.
+   * @returns {void}
+   */
   off(event, fn) {
     const arr = this.listeners.get(event);
     if (!arr) return;
@@ -151,6 +234,11 @@ export class BookViewer {
     if (idx >= 0) arr.splice(idx, 1);
   }
 
+  /**
+   * Returns the latest geometry emitted by the renderer.
+   *
+   * @returns {SpreadGeometry|null} Latest spread geometry.
+   */
   getSpreadGeometry() { return this.latestGeometry; }
 
   // ---- internal ----

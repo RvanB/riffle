@@ -86,28 +86,49 @@ function call(type, payload, { transfer = [], priority = false } = {}) {
   });
 }
 
+/**
+ * Loads a PDF document in the worker.
+ *
+ * @param {ArrayBuffer} buffer PDF data.
+ * @returns {Promise<Object>} Worker document handle.
+ */
 export async function loadPdfDocument(buffer) {
   const transferable = buffer instanceof ArrayBuffer ? [buffer] : [];
   return call("loadDocument", { buffer }, { transfer: transferable });
 }
 
+/**
+ * Returns a PDF page aspect ratio.
+ *
+ * @param {Object} pdfDoc Worker document handle.
+ * @param {number} pageNum One-based PDF page number.
+ * @returns {Promise<number>} Page width divided by page height.
+ */
 export async function getPdfPageAspectRatio(pdfDoc, pageNum) {
   return call("getAspectRatio", { docId: pdfDoc.docId, pageNum });
 }
 
+/**
+ * Returns raster source information for a PDF page.
+ *
+ * @param {Object} pdfDoc Worker document handle.
+ * @param {number} pageNum One-based PDF page number.
+ * @returns {Promise<Object>} Raster source information.
+ */
 export async function getPdfPageRasterSourceInfo(pdfDoc, pageNum) {
   return call("getRasterInfo", { docId: pdfDoc.docId, pageNum });
 }
 
 /**
- * Renders a PDF page at the given scale, returning an ImageBitmap.
+ * Renders a PDF page at a scale.
  *
- * Options:
- *   - downscaleTo: if set, the worker downscales the page to that max-edge
- *     before transferring the bitmap.
- *   - priority: if true, this request jumps ahead of queued low-priority
- *     renders. Use for renders the user is actively waiting on (e.g.
- *     high-res renders for a destination spread).
+ * @param {Object} pdfDoc Worker document handle.
+ * @param {number} pageNum One-based PDF page number.
+ * @param {number} scale Render scale.
+ * @param {Object} [options={}] Render options.
+ * @param {number} [options.downscaleTo=0] If positive, downscale to this maximum edge before transfer.
+ * @param {boolean} [options.priority=false] If true, queue ahead of low-priority renders.
+ * @returns {Promise<ImageBitmap>} Rendered page bitmap.
  */
 export async function renderPdfPage(pdfDoc, pageNum, scale, { downscaleTo = 0, priority = false } = {}) {
   return call(
@@ -117,6 +138,12 @@ export async function renderPdfPage(pdfDoc, pageNum, scale, { downscaleTo = 0, p
   );
 }
 
+/**
+ * Requests worker cleanup for a PDF document.
+ *
+ * @param {Object} pdfDoc Worker document handle.
+ * @returns {void}
+ */
 export function requestPdfDocumentCleanup(pdfDoc) {
   if (!pdfDoc?.docId) return;
   call("requestCleanup", { docId: pdfDoc.docId }).catch(() => {});

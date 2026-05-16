@@ -84,21 +84,45 @@ function buildPaperAppearance(preset) {
   };
 }
 
+/**
+ * Returns the available paper presets.
+ *
+ * @returns {Array<{id: string, label: string}>} Preset options.
+ */
 export function getPaperPresetOptions() {
   return PAPER_PRESETS.map(({ id, label }) => ({ id, label }));
 }
 
+/**
+ * Returns a valid paper preset id, falling back to the default.
+ *
+ * @param {string} presetId Preset id to normalize.
+ * @returns {string} Valid preset id.
+ */
 export function normalizePaperPreset(presetId) {
   return PAPER_PRESETS.some(preset => preset.id === presetId)
     ? presetId
     : DEFAULT_PAPER_PRESET_ID;
 }
 
+/**
+ * Finds the paper preset id matching a paper color.
+ *
+ * @param {string} paperColor CSS hex paper color.
+ * @returns {string} Matching preset id, or the default preset id.
+ */
 export function getPaperPresetIdForColor(paperColor) {
   const normalized = typeof paperColor === "string" ? paperColor.toLowerCase() : "";
   return PAPER_PRESETS.find(preset => preset.paperColor.toLowerCase() === normalized)?.id || DEFAULT_PAPER_PRESET_ID;
 }
 
+/**
+ * Applies preset-derived paper colors to a display object.
+ *
+ * @param {Partial<Display>} display Display object to mutate.
+ * @param {string} presetId Paper preset id.
+ * @returns {Partial<Display>} The mutated display object.
+ */
 export function applyPaperPreset(display, presetId) {
   const normalizedPresetId = normalizePaperPreset(presetId);
   const preset = PAPER_PRESETS.find(entry => entry.id === normalizedPresetId);

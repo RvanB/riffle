@@ -16,9 +16,11 @@
     "dist"
   ],
   "scripts": {
-    "build": "esbuild src/index.js --bundle --format=esm --minify --sourcemap --outfile=dist/riffle.min.js && esbuild src/loading/pdfWorker.js --bundle --format=esm --minify --sourcemap --outfile=dist/pdfWorker.js"
+    "build": "esbuild src/index.js --bundle --format=esm --minify --sourcemap --outfile=dist/riffle.min.js && esbuild src/loading/pdfWorker.js --bundle --format=esm --minify --sourcemap --outfile=dist/pdfWorker.js",
+    "docs": "jsdoc -c jsdoc.json"
   },
   "devDependencies": {
-    "esbuild": "^0.23.0"
+    "esbuild": "^0.23.0",
+    "jsdoc": "^4.0.5"
   }
 }
