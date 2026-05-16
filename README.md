@@ -1,13 +1,13 @@
-# Riffle
+# riffle.js
 
-Riffle is a browser book viewer for page bitmaps and PDFs. It renders a two-page spread with animated page turns with paper lighting and translucency.
+riffle.js is a browser book viewer for page bitmaps and PDFs. It renders a two-page spread with animated page turns with paper lighting and translucency.
 
 The library returns plain DOM elements and does not impose wrappers or app layout. You decide where the canvas lives, how it scrolls, and how the optional page strip is styled.
 
 - [Live demo](https://rvanb.github.io/riffle.js/)
 - [API reference](https://rvanb.github.io/riffle.js/docs/)
 
-![Riffle viewer screenshot](https://media.githubusercontent.com/media/RvanB/riffle.js/refs/heads/main/artifacts/riffle.png)
+![riffle.js screenshot](https://media.githubusercontent.com/media/RvanB/riffle.js/refs/heads/main/artifacts/riffle.png)
 
 *A screenshot of [the demo](https://rvanbronkhorst.com/riffle.js/) — view its [source](https://github.com/RvanB/riffle.js/blob/main/index.html).*
 
