@@ -78,10 +78,22 @@
           justify-content: center;
           align-items: center;
           padding: 32px;
+          position: relative;
       }
       #viewport canvas {
           filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.26));
       }
+      #loading-status {
+          position: absolute;
+          inset: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #aaa;
+          font-size: 14px;
+          pointer-events: none;
+      }
+      #loading-status[hidden] { display: none; }
       #strip-container {
           flex: 0 0 64px;
           background: #161616;
@@ -143,7 +155,9 @@
         <button id="zoom-in" type="button">+</button>
       </div>
     </header>
-    <div id="viewport"></div>
+    <div id="viewport">
+      <div id="loading-status" role="status">Loading PDF...</div>
+    </div>
     <div id="strip-container"></div>
     <script type="importmap">
       {
@@ -157,10 +171,11 @@
 
       const viewport = document.getElementById("viewport");
       const stripContainer = document.getElementById("strip-container");
+      const loadingStatus = document.getElementById("loading-status");
       const viewer = Riffle({ paperPreset: "natural" });
       viewport.appendChild(viewer);
       stripContainer.appendChild(RifflePageStrip(viewer));
-      const defaultPdfUrl = "./artifacts/robinhood.pdf";
+      const defaultPdfUrl = "https://media.githubusercontent.com/media/RvanB/riffle.js/refs/heads/main/artifacts/robinhood.pdf";
 
       const pageInput = document.getElementById("page-input");
       const spreadReadout = document.getElementById("spread-readout");
@@ -212,15 +227,21 @@
           const file = event.target.files?.[0];
           event.target.value = "";
           if (!file) return;
+          loadingStatus.hidden = false;
+          loadingStatus.textContent = "Loading PDF...";
           try {
               await viewer.openPdf(file);
               refreshPageReadout();
+              loadingStatus.hidden = true;
           } catch (error) {
               console.error(error);
+              loadingStatus.textContent = "Could not load PDF";
           }
       });
 
       const openDefaultPdf = async () => {
+          loadingStatus.hidden = false;
+          loadingStatus.textContent = "Loading PDF...";
           try {
               const response = await fetch(defaultPdfUrl);
               if (!response.ok) throw new Error(`Failed to load default PDF: ${response.status}`);
@@ -228,8 +249,10 @@
               const file = new File([blob], "robinhood.pdf", { type: "application/pdf" });
               await viewer.openPdf(file);
               refreshPageReadout();
+              loadingStatus.hidden = true;
           } catch (error) {
               console.error(error);
+              loadingStatus.textContent = "Could not load PDF";
           }
       };
       openDefaultPdf();
