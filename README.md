@@ -9,6 +9,8 @@ The library returns plain DOM elements and does not impose wrappers or app layou
 
 ![Riffle viewer screenshot](https://media.githubusercontent.com/media/RvanB/riffle.js/refs/heads/main/artifacts/riffle.png)
 
+*A screenshot of [the demo](https://rvanbronkhorst.com/riffle.js/) — view its [source](https://github.com/RvanB/riffle.js/blob/main/index.html).*
+
 ## Quick Start
 
 A minimal, paste-and-run HTML file:
