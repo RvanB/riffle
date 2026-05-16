@@ -115,28 +115,11 @@
 <li><strong>Lay out the page strip.</strong> <code>RifflePageStrip</code> returns an empty <code>&lt;div&gt;</code> that fills with one child per page — apply your own flex/grid styling to it.</li>
 </ul>
 <p><code>dist/pdfWorker.js</code> must sit next to <code>dist/riffle.min.js</code> at runtime. The CDN build resolves it from the same URL path as the library bundle.</p>
-<h2>Local Development</h2>
-<pre class="prettyprint source lang-bash"><code>npm install
-npm run build
-python3 -m http.server 8000
-</code></pre>
-<p>Open <code>http://localhost:8000/</code> for the demo. While iterating locally, the demo imports <code>./src/index.js</code>; production consumers usually import <code>dist/riffle.min.js</code>.</p>
 <h2>Documentation</h2>
-<p>Documentation lives alongside the demo on GitHub Pages: <a href="https://rvanb.github.io/riffle.js/docs/">rvanb.github.io/riffle.js/docs</a>. The API reference is generated from JSDoc comments in <code>src/</code> by <a href="https://jsdoc.app/">JSDoc</a> with the <a href="https://github.com/clenemt/docdash">docdash</a> template, then committed to <code>docs/</code> so GitHub Pages can serve it directly.</p>
-<p>To rebuild locally:</p>
-<pre class="prettyprint source lang-bash"><code>npm run docs
-</code></pre>
-<p>Releases are cut with <code>./scripts/release.sh vX.Y.Z</code>, which rebuilds <code>dist/</code> and <code>docs/</code>, commits, tags, and pushes.</p>
-<h2>Build Output</h2>
-<pre class="prettyprint source lang-text"><code>dist/
-  riffle.min.js
-  riffle.min.js.map
-  pdfWorker.js
-  pdfWorker.js.map
-</code></pre>
-<p>To publish through jsDelivr, commit the built <code>dist/</code> files, tag a release, and import from:</p>
-<pre class="prettyprint source lang-js"><code>import { Riffle } from &quot;https://cdn.jsdelivr.net/gh/RvanB/riffle.js@vX.Y.Z/dist/riffle.min.js&quot;;
-</code></pre></article>
+<ul>
+<li><a href="https://rvanb.github.io/riffle.js/docs/">API reference</a></li>
+<li><a href="https://rvanb.github.io/riffle.js/">Live demo</a></li>
+</ul></article>
     </section>
 
 
