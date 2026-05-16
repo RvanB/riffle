@@ -56,40 +56,7 @@ Two things the library leaves to you:
 
 `dist/pdfWorker.js` must sit next to `dist/riffle.min.js` at runtime. The CDN build resolves it from the same URL path as the library bundle.
 
-## Local Development
-
-```bash
-npm install
-npm run build
-python3 -m http.server 8000
-```
-
-Open `http://localhost:8000/` for the demo. While iterating locally, the demo imports `./src/index.js`; production consumers usually import `dist/riffle.min.js`.
-
 ## Documentation
 
-Documentation lives alongside the demo on GitHub Pages: [rvanb.github.io/riffle.js/docs](https://rvanb.github.io/riffle.js/docs/). The API reference is generated from JSDoc comments in `src/` by [JSDoc](https://jsdoc.app/) with the [docdash](https://github.com/clenemt/docdash) template, then committed to `docs/` so GitHub Pages can serve it directly.
-
-To rebuild locally:
-
-```bash
-npm run docs
-```
-
-Releases are cut with `./scripts/release.sh vX.Y.Z`, which rebuilds `dist/` and `docs/`, commits, tags, and pushes.
-
-## Build Output
-
-```text
-dist/
-  riffle.min.js
-  riffle.min.js.map
-  pdfWorker.js
-  pdfWorker.js.map
-```
-
-To publish through jsDelivr, commit the built `dist/` files, tag a release, and import from:
-
-```js
-import { Riffle } from "https://cdn.jsdelivr.net/gh/RvanB/riffle.js@vX.Y.Z/dist/riffle.min.js";
-```
+- [API reference](https://rvanb.github.io/riffle.js/docs/)
+- [Live demo](https://rvanb.github.io/riffle.js/)
