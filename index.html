@@ -79,8 +79,8 @@
       #stage {
           min-width: 100%;
           min-height: 100%;
-          width: max-content;
-          height: max-content;
+          width: 100%;
+          height: 100%;
           display: flex;
           justify-content: center;
           align-items: center;
@@ -152,6 +152,10 @@
         <span>Open PDF</span>
         <input type="file" id="pdf-input" accept="application/pdf" />
       </label>
+      <label class="file-picker">
+        <span>Attach hOCR</span>
+        <input type="file" id="hocr-input" accept=".hocr,text/html,application/xhtml+xml" />
+      </label>
       <a class="doc-link" href="./docs/">Docs</a>
       <div id="page-jump">
         <input id="page-input" type="number" min="1" value="" />
@@ -181,7 +185,7 @@
       const stage = document.getElementById("stage");
       const stripContainer = document.getElementById("strip-container");
       const loadingStatus = document.getElementById("loading-status");
-      const viewer = Riffle({ paperPreset: "bright-white", renderScale: 1.5 });
+      const viewer = Riffle({ viewport, paperPreset: "bright-white", renderScale: 1.5 });
       stage.appendChild(viewer);
       stripContainer.appendChild(RifflePageStrip(viewer));
 
@@ -244,6 +248,24 @@
           } catch (error) {
               console.error(error);
               loadingStatus.textContent = "Could not load PDF";
+          }
+      });
+
+      document.getElementById("hocr-input").addEventListener("change", async (event) => {
+          const file = event.target.files?.[0];
+          event.target.value = "";
+          if (!file) return;
+          loadingStatus.hidden = false;
+          loadingStatus.textContent = "Loading hOCR...";
+          try {
+              const { attached } = await viewer.openHocr(file);
+              loadingStatus.textContent = `Attached hOCR to ${attached} page${attached === 1 ? "" : "s"}`;
+              window.setTimeout(() => {
+                  if (loadingStatus.textContent.startsWith("Attached hOCR")) loadingStatus.hidden = true;
+              }, 1400);
+          } catch (error) {
+              console.error(error);
+              loadingStatus.textContent = "Could not attach hOCR";
           }
       });
 

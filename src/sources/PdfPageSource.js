@@ -9,6 +9,7 @@ const ASPECT_RATIO_WARNING_EPSILON = 0.001;
 function makePdfPage(pdfDoc, pageNum, aspectRatio) {
   return {
     source: { type: "pdf", pdfDoc, pageNum },
+    ocrTextContent: null,
     aspectRatio,
     srcCanvas: null,
     previewCanvas: null,
@@ -136,5 +137,26 @@ export class PdfPageSource extends PageSource {
     const page = this.pages[index] ?? null;
     if (!page) return null;
     return { aspectRatio: page.aspectRatio, passthrough: page };
+  }
+
+  /**
+   * Attaches externally-generated text content to PDF pages.
+   *
+   * @param {Object[]} pages Text content pages, such as parsed hOCR pages.
+   * @param {Object} [options={}] Attachment options.
+   * @param {number} [options.pageOffset=0] Zero-based destination page offset.
+   * @returns {number} Number of pages attached.
+   */
+  attachTextContent(pages, { pageOffset = 0 } = {}) {
+    if (!Array.isArray(pages)) throw new TypeError("attachTextContent: pages must be an array");
+    let count = 0;
+    for (let i = 0; i < pages.length; i += 1) {
+      const page = this.pages[pageOffset + i];
+      if (!page) continue;
+      page.ocrTextContent = pages[i] || null;
+      this.notifyPageChanged(pageOffset + i);
+      count += 1;
+    }
+    return count;
   }
 }

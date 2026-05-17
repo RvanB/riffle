@@ -58,6 +58,7 @@ export {
   getPdfPageLinkAnnotations,
   requestPdfDocumentCleanup,
 } from "./loading/pdfLoader.js";
+export { loadHocr, parseHocr } from "./loading/hocr.js";
 
 // Image loading + downscaling helpers.
 export { loadImageFile, loadImagePreview } from "./loading/imageLoader.js";

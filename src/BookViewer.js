@@ -84,6 +84,11 @@ export class BookViewer {
     this.latestGeometry = null;
     this.source = null;
     this.book = new ViewerBook({ getPageCount: () => 0, getPageMetadata: () => null, on: () => () => {} });
+    this.resizeObserver = null;
+    this.observedResizeTarget = null;
+    this.resizeFrame = 0;
+    this.resizeDebounceTimer = 0;
+    this.boundResize = () => this.#scheduleResizeRedraw();
 
     // Renderer + loaders.
     this.spreadRenderer = new rendererClass(spreadCanvas);
@@ -92,6 +97,11 @@ export class BookViewer {
     // Controllers — they read fields off `this` (the viewer).
     this.navigationController = new NavigationController(this);
     this.zoomController = new ZoomController(this, { renderScale });
+    if (typeof ResizeObserver !== "undefined") {
+      this.resizeObserver = new ResizeObserver(this.boundResize);
+    } else {
+      spreadCanvas.ownerDocument?.defaultView?.addEventListener("resize", this.boundResize);
+    }
 
     if (source) this.setSource(source);
   }
@@ -173,6 +183,7 @@ export class BookViewer {
    */
   setViewport(viewport) {
     this.viewport = viewport;
+    this.#observeResizeTarget();
     this.redraw();
   }
 
@@ -247,6 +258,7 @@ export class BookViewer {
 
   redraw() {
     if (!this.spreadRenderer || !this.book) return;
+    this.#observeResizeTarget();
     const scale = this.zoomController.getRenderScale();
     const margins = computeMargins(this.layout, scale);
     this.lastMargins = margins;
@@ -360,6 +372,42 @@ export class BookViewer {
       numSpreads() { return 1; },
       spreadPageEntries() { return { left: { page: null, pageIndex: -1, showThroughPage: null }, right: { page: null, pageIndex: -1, showThroughPage: null } }; },
     };
+  }
+
+  #observeResizeTarget() {
+    if (!this.resizeObserver) return;
+    const target = this.zoomController.getViewportElement?.() ?? null;
+    if (target === this.observedResizeTarget) return;
+    if (this.observedResizeTarget) this.resizeObserver.unobserve(this.observedResizeTarget);
+    this.observedResizeTarget = target;
+    if (target) this.resizeObserver.observe(target);
+  }
+
+  #scheduleResizeRedraw() {
+    if (this.resizeFrame) return;
+    const win = this.spreadCanvas.ownerDocument?.defaultView ?? globalThis;
+    this.resizeFrame = win.requestAnimationFrame?.(() => {
+      this.resizeFrame = 0;
+      this.zoomController.syncCanvasStage();
+      if (this.resizeDebounceTimer) win.clearTimeout?.(this.resizeDebounceTimer);
+      this.resizeDebounceTimer = win.setTimeout?.(() => {
+        this.resizeDebounceTimer = 0;
+        this.zoomController.applySafeRenderZoom();
+        this.redraw();
+        this.schedulePreviewRedraw();
+      }, 160) ?? 0;
+      if (!this.resizeDebounceTimer) {
+        this.zoomController.applySafeRenderZoom();
+        this.redraw();
+        this.schedulePreviewRedraw();
+      }
+    }) ?? 0;
+    if (!this.resizeFrame) {
+      this.zoomController.syncCanvasStage();
+      this.zoomController.applySafeRenderZoom();
+      this.redraw();
+      this.schedulePreviewRedraw();
+    }
   }
 
   emit(event, ...args) {

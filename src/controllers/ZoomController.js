@@ -1,4 +1,4 @@
-import { computeMargins, computeScale } from "../rendering/layout.js";
+import { computeScale } from "../rendering/layout.js";
 
 const CONTENT_ZOOM_MIN = 0.5;
 const CONTENT_ZOOM_MAX = 6;
@@ -16,8 +16,8 @@ function findScrollableAncestor(node) {
 }
 
 // Owns content/render zoom. Reads viewer.spreadCanvas + viewer.viewport for
-// sizing math, sets CSS dimensions directly on the canvas to display it at
-// the current zoom level. No DOM wrappers required.
+// sizing math, and lets CSS scale the canvas display box smoothly while the
+// backing store is redrawn after layout settles.
 export class ZoomController {
   constructor(viewer, { renderScale = 1 } = {}) {
     this.viewer = viewer;
@@ -30,8 +30,12 @@ export class ZoomController {
     return this.viewer.viewport ?? findScrollableAncestor(this.viewer.spreadCanvas);
   }
 
+  getViewportElement() {
+    return this.#resolveViewport();
+  }
+
   getCanvasViewportSize() {
-    const viewport = this.#resolveViewport();
+    const viewport = this.getViewportElement();
     const rect = viewport?.getBoundingClientRect();
     return {
       width: Math.max(1, rect?.width ?? 1),
@@ -41,38 +45,36 @@ export class ZoomController {
 
   getRenderScale() {
     const viewport = this.getCanvasViewportSize();
-    const containerWidth = Math.max(1, viewport.width - 64);
-    const containerHeight = Math.max(1, viewport.height - 64);
-    const baseScale = computeScale(this.viewer.layout, containerWidth, containerHeight);
+    const baseScale = computeScale(this.viewer.layout, viewport.width, viewport.height);
     return baseScale * this.renderZoom;
   }
 
   getSafeRenderZoom(targetZoom = this.contentZoom) {
     const viewport = this.getCanvasViewportSize();
-    const containerWidth = Math.max(1, viewport.width - 64);
-    const containerHeight = Math.max(1, viewport.height - 64);
-    const baseScale = computeScale(this.viewer.layout, containerWidth, containerHeight);
-    const baseMargins = computeMargins(this.viewer.layout, baseScale);
-    const maxWidthZoom = (2 * baseMargins.pagePxW) > 0
-      ? MAX_RENDER_CANVAS_EDGE / (2 * baseMargins.pagePxW)
+    const baseScale = computeScale(this.viewer.layout, viewport.width, viewport.height);
+    const baseWidth = 2 * this.viewer.layout.pw * baseScale;
+    const baseHeight = this.viewer.layout.ph * baseScale;
+    const maxWidthZoom = baseWidth > 0
+      ? MAX_RENDER_CANVAS_EDGE / baseWidth
       : targetZoom;
-    const maxHeightZoom = baseMargins.pagePxH > 0
-      ? MAX_RENDER_CANVAS_EDGE / baseMargins.pagePxH
+    const maxHeightZoom = baseHeight > 0
+      ? MAX_RENDER_CANVAS_EDGE / baseHeight
       : targetZoom;
     return Math.max(CONTENT_ZOOM_MIN, Math.min(targetZoom, maxWidthZoom, maxHeightZoom));
   }
 
-  // Sets CSS width/height on the spread canvas so it displays at the
-  // requested content zoom (the canvas's pixel buffer is sized for the
-  // current renderZoom; the CSS scaling adjusts the displayed size).
+  // Sets percentage CSS sizing only when zoom changes. Window/container
+  // resizes are handled by CSS itself; the backing canvas catches up after a
+  // debounced redraw.
   syncCanvasStage() {
     const { spreadCanvas } = this.viewer;
     if (!spreadCanvas) return;
-    const displayScale = this.renderZoom > 0 ? this.contentZoom / this.renderZoom : this.contentZoom;
-    const cssW = `${Math.max(1, Math.round(spreadCanvas.width * displayScale))}px`;
-    const cssH = `${Math.max(1, Math.round(spreadCanvas.height * displayScale))}px`;
+    const size = `${Math.max(0.01, this.contentZoom) * 100}%`;
+    const cssW = size;
+    const cssH = size;
     if (spreadCanvas.style.width !== cssW) spreadCanvas.style.width = cssW;
     if (spreadCanvas.style.height !== cssH) spreadCanvas.style.height = cssH;
+    if (spreadCanvas.style.objectFit !== "contain") spreadCanvas.style.objectFit = "contain";
   }
 
   #zoomTo(nextZoom) {

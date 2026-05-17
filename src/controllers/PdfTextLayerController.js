@@ -73,13 +73,31 @@ function multiplyTransform(m1, m2) {
   ];
 }
 
-function getDisplayScale(canvas) {
+function getDisplayRect(canvas) {
   const computedStyle = canvas.ownerDocument?.defaultView?.getComputedStyle(canvas);
   const cssWidth = canvas.clientWidth || parseFloat(canvas.style.width) || parseFloat(computedStyle?.width) || canvas.width || 1;
   const cssHeight = canvas.clientHeight || parseFloat(canvas.style.height) || parseFloat(computedStyle?.height) || canvas.height || 1;
+  const intrinsicWidth = Math.max(1, canvas.width || cssWidth);
+  const intrinsicHeight = Math.max(1, canvas.height || cssHeight);
+  const objectFit = computedStyle?.objectFit || canvas.style.objectFit || "fill";
+  if (objectFit === "contain") {
+    const scale = Math.min(cssWidth / intrinsicWidth, cssHeight / intrinsicHeight);
+    const width = intrinsicWidth * scale;
+    const height = intrinsicHeight * scale;
+    return {
+      x: scale,
+      y: scale,
+      left: (cssWidth - width) / 2,
+      top: (cssHeight - height) / 2,
+      cssWidth: width,
+      cssHeight: height,
+    };
+  }
   return {
-    x: cssWidth / Math.max(1, canvas.width || cssWidth),
-    y: cssHeight / Math.max(1, canvas.height || cssHeight),
+    x: cssWidth / intrinsicWidth,
+    y: cssHeight / intrinsicHeight,
+    left: 0,
+    top: 0,
     cssWidth,
     cssHeight,
   };
@@ -91,6 +109,14 @@ function isPdfPage(page) {
 
 function getPdfSource(page) {
   return page?.metadata?.source ?? page?.source ?? null;
+}
+
+function getOcrTextContent(page) {
+  return page?.metadata?.ocrTextContent ?? page?.ocrTextContent ?? null;
+}
+
+function hasTextLayer(page) {
+  return !!getOcrTextContent(page) || isPdfPage(page);
 }
 
 function rectsIntersect(a, b) {
@@ -123,7 +149,7 @@ function transformPoint(transform, x, y) {
 }
 
 /**
- * DOM text overlay for PDF-backed pages.
+ * DOM text overlay for pages with embedded PDF text or external OCR text.
  *
  * This is deliberately active only on settled spreads. During animation the
  * canvas is the source of truth, and trying to morph real DOM text with the
@@ -211,7 +237,7 @@ export class PdfTextLayerController {
 
     const sides = ["left", "right"]
       .map(sideName => sideStates[sideName])
-      .filter(sideState => sideState?.page && sideState?.drawnRect && isPdfPage(sideState.page));
+      .filter(sideState => sideState?.page && sideState?.drawnRect && hasTextLayer(sideState.page));
     if (!sides.length) {
       this.hide();
       return;
@@ -220,7 +246,7 @@ export class PdfTextLayerController {
     const token = ++this.renderToken;
     this.#render(sides, token).catch(error => {
       if (token === this.renderToken) {
-        console.warn("[Riffle] Could not render PDF text layer:", error);
+        console.warn("[Riffle] Could not render text layer:", error);
         this.hide();
       }
     });
@@ -230,6 +256,11 @@ export class PdfTextLayerController {
     const fragments = [];
     const order = { value: 0 };
     for (const sideState of sides) {
+      const ocrTextContent = getOcrTextContent(sideState.page);
+      if (ocrTextContent) {
+        fragments.push(this.#buildPageFragment(sideState, ocrTextContent, order));
+        continue;
+      }
       const source = getPdfSource(sideState.page);
       if (!source?.pdfDoc || !source.pageNum) continue;
       const [textContent, linkAnnotations] = await Promise.all([
@@ -749,7 +780,7 @@ export class PdfTextLayerController {
     const { spreadCanvas } = this.viewer;
     const computedStyle = spreadCanvas.ownerDocument.defaultView?.getComputedStyle(spreadCanvas);
     const canvasHidden = computedStyle?.display === "none";
-    const scale = getDisplayScale(spreadCanvas);
+    const displayRect = getDisplayRect(spreadCanvas);
     this.layer.classList.toggle("text-visible", canvasHidden);
 
     if (canvasHidden) {
@@ -758,15 +789,15 @@ export class PdfTextLayerController {
       this.layer.style.top = "";
       this.layer.style.width = `${Math.max(1, spreadCanvas.width)}px`;
       this.layer.style.height = `${Math.max(1, spreadCanvas.height)}px`;
-      this.layer.style.transform = `scale(${scale.x}, ${scale.y})`;
+      this.layer.style.transform = `scale(${displayRect.x}, ${displayRect.y})`;
       return;
     }
 
     this.layer.style.position = "absolute";
-    this.layer.style.left = `${spreadCanvas.offsetLeft}px`;
-    this.layer.style.top = `${spreadCanvas.offsetTop}px`;
+    this.layer.style.left = `${spreadCanvas.offsetLeft + displayRect.left}px`;
+    this.layer.style.top = `${spreadCanvas.offsetTop + displayRect.top}px`;
     this.layer.style.width = `${Math.max(1, spreadCanvas.width)}px`;
     this.layer.style.height = `${Math.max(1, spreadCanvas.height)}px`;
-    this.layer.style.transform = `scale(${scale.x}, ${scale.y})`;
+    this.layer.style.transform = `scale(${displayRect.x}, ${displayRect.y})`;
   }
 }

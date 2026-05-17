@@ -58,6 +58,9 @@ export function Riffle({
   spreadCanvas.width = 0;
   spreadCanvas.height = 0;
   spreadCanvas.style.display = "block";
+  spreadCanvas.style.width = "100%";
+  spreadCanvas.style.height = "100%";
+  spreadCanvas.style.objectFit = "contain";
 
   const rendererClass = pickRendererClass(renderer);
   const bookViewer = new BookViewer({
@@ -119,6 +122,17 @@ export function Riffle({
         pw: bookViewer.layout.ph * firstAspect,
         ratio: firstAspect * 0.999,
       });
+    },
+    openHocr: async (fileOrText, options = {}) => {
+      const { loadHocr } = await import("./loading/hocr.js");
+      const pages = await loadHocr(fileOrText);
+      const attach = bookViewer.source?.attachTextContent;
+      if (typeof attach !== "function") {
+        throw new Error("Current Riffle source does not support external text content");
+      }
+      const attached = attach.call(bookViewer.source, pages, options);
+      pdfTextLayer?.update();
+      return { pages, attached };
     },
   };
   // Use defineProperties so getters stay live — Object.assign would
